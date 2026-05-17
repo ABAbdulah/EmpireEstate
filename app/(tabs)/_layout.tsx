@@ -1,9 +1,10 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Text, View, StyleSheet, Platform } from 'react-native';
-import { palette, typography } from '../../src/theme';
+import { Text, View, StyleSheet } from 'react-native';
+import { palette } from '../../src/theme';
 import { OfflineEarningsHost } from '../../src/components/OfflineEarningsHost';
+import { AppTabBar } from '../../src/components/AppTabBar';
 
 interface IconProps { focused: boolean; name: keyof typeof Ionicons.glyphMap; nameOutline: keyof typeof Ionicons.glyphMap; badge?: string }
 function TabIcon({ focused, name, nameOutline, badge }: IconProps) {
@@ -24,18 +25,8 @@ export default function TabsLayout() {
     <>
       <Tabs
         initialRouteName="earnings"
-        screenOptions={{
-          headerShown: false,
-          tabBarActiveTintColor: palette.primary,
-          tabBarInactiveTintColor: palette.textTertiary,
-          tabBarLabelStyle: { ...typography.micro, marginBottom: 2 },
-          tabBarStyle: {
-            backgroundColor: palette.surface,
-            borderTopColor: palette.border,
-            paddingTop: 6,
-            height: Platform.OS === 'ios' ? 84 : 64,
-          },
-        }}
+        tabBar={(props) => <AppTabBar {...props} />}
+        screenOptions={{ headerShown: false }}
       >
         <Tabs.Screen
           name="investing"

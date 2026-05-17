@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGame } from '../../src/store/gameStore';
+import { useBottomPadding } from '../../src/hooks/useBottomPadding';
 import { TapZone } from '../../src/components/TapZone';
 import { MoneyText } from '../../src/components/MoneyText';
 import { palette, radius, spacing, typography, shadow } from '../../src/theme';
@@ -14,6 +15,7 @@ export default function EarningsScreen() {
   const state = useGame((s) => s.state);
   const doTap = useGame((s) => s.doTap);
   const addBoost = useGame((s) => s.addBoost);
+  const bottomPad = useBottomPadding();
   const balance = M(state.balance);
   const perClick = tapBaseReward(state.tapLevel, balance);
   const nextClick = tapBaseReward(state.tapLevel + 1, balance);
@@ -22,7 +24,7 @@ export default function EarningsScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomPad }]}>
         <LinearGradient colors={['#0E7C66', '#0F172A']} style={styles.heroBlock} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
           <View style={styles.card}>
             <View style={styles.cardTop}>

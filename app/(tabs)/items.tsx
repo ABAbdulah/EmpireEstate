@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGame } from '../../src/store/gameStore';
+import { useBottomPadding } from '../../src/hooks/useBottomPadding';
 import { palette, radius, shadow, spacing, typography } from '../../src/theme';
 import { formatMoney, M } from '../../src/lib/money';
 import { ITEMS, COLLECTIONS, ItemCategory } from '../../src/content/items';
@@ -17,6 +18,7 @@ const HERO_TILES: Array<{ key: ItemCategory; label: string; gradient: [string, s
 export default function ItemsScreen() {
   const state = useGame((s) => s.state);
   const buy = useGame((s) => s.buyItem);
+  const bottomPad = useBottomPadding();
   const [openCategory, setOpenCategory] = useState<ItemCategory | null>(null);
 
   const ownedByCategory = useMemo(() => {
@@ -30,7 +32,7 @@ export default function ItemsScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomPad }]}>
         <Text style={styles.heading}>Items</Text>
 
         <View style={styles.heroRow}>

@@ -32,8 +32,9 @@ export default function RootLayout() {
         <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: palette.bg } }}>
           <Stack.Screen name="(tabs)" />
           <Stack.Screen name="business/[id]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
-          <Stack.Screen name="stock/[ticker]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
-          <Stack.Screen name="crypto/[symbol]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+          <Stack.Screen name="car-business/[id]/index" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+          <Stack.Screen name="car-business/[id]/market" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+          <Stack.Screen name="car-business/[id]/skills" options={{ presentation: 'card', animation: 'slide_from_right' }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

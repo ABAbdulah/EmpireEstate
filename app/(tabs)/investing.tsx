@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGame } from '../../src/store/gameStore';
+import { useBottomPadding } from '../../src/hooks/useBottomPadding';
 import { palette, radius, shadow, spacing, typography } from '../../src/theme';
 import { formatMoney, formatPercent, M } from '../../src/lib/money';
 import { getAllStocks, getAllCryptos, StockSnapshot, CryptoSnapshot } from '../../src/game/market';
@@ -40,6 +41,7 @@ function TabBtn({ label, active, onPress }: { label: string; active: boolean; on
 
 function SharesView() {
   const state = useGame((s) => s.state);
+  const bottomPad = useBottomPadding();
   const snapshots: StockSnapshot[] = useMemo(() => getAllStocks(), []);
   const portfolio = useMemo(() => {
     let total = new Decimal(0);
@@ -66,7 +68,7 @@ function SharesView() {
   const growth = snapshots.filter((s) => s.template.volatility > 0.15).slice(0, 3);
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomPad }]}>
       <Pressable style={styles.portfolioCard} onPress={() => {}}>
         <View style={styles.portfolioHeader}>
           <Ionicons name="briefcase" size={18} color="#FFFFFF" />
@@ -145,12 +147,13 @@ function StockRow({ snap, owned }: { snap: StockSnapshot; owned: number }) {
 
 function CryptoView() {
   const state = useGame((s) => s.state);
+  const bottomPad = useBottomPadding();
   const snapshots: CryptoSnapshot[] = useMemo(() => getAllCryptos(), []);
   const buy = useGame((s) => s.buyCrypto);
   const sell = useGame((s) => s.sellCrypto);
 
   return (
-    <ScrollView contentContainerStyle={styles.content}>
+    <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomPad }]}>
       <View style={styles.cryptoHero}>
         <Ionicons name="logo-bitcoin" size={28} color="#F5B100" />
         <View style={{ flex: 1 }}>
@@ -198,8 +201,9 @@ function CryptoView() {
 }
 
 function RealEstateView() {
+  const bottomPad = useBottomPadding();
   return (
-    <ScrollView contentContainerStyle={[styles.content, { alignItems: 'center', paddingTop: 80 }]}>
+    <ScrollView contentContainerStyle={[styles.content, { alignItems: 'center', paddingTop: 80, paddingBottom: bottomPad }]}>
       <Ionicons name="home-outline" size={48} color={palette.textTertiary} />
       <Text style={styles.emptyTitle}>Real Estate</Text>
       <Text style={styles.emptySubtitle}>Coming next: studios, apartments, penthouses, hotels.</Text>

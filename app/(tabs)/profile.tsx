@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import Decimal from 'decimal.js';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGame, computeNetworth, aggregateBySource } from '../../src/store/gameStore';
+import { useBottomPadding } from '../../src/hooks/useBottomPadding';
 import { NetworthCard } from '../../src/components/NetworthCard';
 import { AssetCard } from '../../src/components/AssetCard';
 import { Card } from '../../src/components/Card';
@@ -17,6 +18,7 @@ export default function ProfileScreen() {
   const state = useGame((s) => s.state);
   const payTaxes = useGame((s) => s.payTaxes);
   const resetGame = useGame((s) => s.reset);
+  const bottomPad = useBottomPadding();
 
   const networth = useMemo(() => computeNetworth(state), [state]);
   const by = useMemo(() => aggregateBySource(state), [state]);
@@ -26,7 +28,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 24 }]} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.heading}>Profile</Text>
           <Pressable style={styles.connectBtn}>

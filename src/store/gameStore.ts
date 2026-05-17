@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 import { produce } from 'immer';
 import Decimal from 'decimal.js';
-import { GameState, INITIAL_STATE, ActiveBoost } from './types';
+import { GameState, INITIAL_STATE, ActiveBoost, CarBusiness, CarInventoryItem } from './types';
 import { loadState, saveState } from './storage';
 import { M, Money, ZERO } from '../lib/money';
-import { businessTemplate, computePlayerLevel, levelIncomePerCycle, levelIncomePerHour, tapBaseReward, upgradeCost } from '../game/economy';
+import { businessTemplate, computePlayerLevel, levelIncomePerCycle, levelIncomePerHour, pendingCycles, pendingReward, tapBaseReward, upgradeCost } from '../game/economy';
 import { BUSINESSES } from '../content/businesses';
 import { STOCKS, CRYPTOS } from '../content/stocks';
+import { SHOWROOM_SIZES, SERVICE_SIZES, SPECIALIZATIONS, generateUsedCarOffer, CAR_CATALOG } from '../content/carBusiness';
 
 interface StoreState {
   state: GameState;
@@ -19,10 +20,12 @@ interface StoreState {
 
   doTap: () => Money;
 
-  buyBusiness: (templateId: string) => boolean;
+  buyBusiness: (templateId: string, customName?: string) => boolean;
   upgradeBusiness: (templateId: string, qty: number | 'max') => boolean;
   hireManager: (templateId: string) => boolean;
+  renameBusiness: (templateId: string, name: string) => void;
   collectBusiness: (templateId: string, nowMs: number) => Money;
+  collectAllBusinesses: (nowMs: number) => Money;
 
   buyStock: (ticker: string, qty: number, price: number) => boolean;
   sellStock: (ticker: string, qty: number, price: number) => boolean;
@@ -33,6 +36,18 @@ interface StoreState {
 
   addBoost: (boost: ActiveBoost) => void;
   payTaxes: () => boolean;
+
+  createCarBusiness: (params: {
+    name: string;
+    showroomType: 'used' | 'new';
+    showroomSize: 'small' | 'mid' | 'large';
+    specialization: 'mass' | 'luxury' | 'premium';
+  }) => { ok: boolean; uid?: string; reason?: string };
+  buyCarServiceForBusiness: (uid: string, size: 'small' | 'mid' | 'large') => boolean;
+  setCarSpecialization: (uid: string, specialization: 'mass' | 'luxury' | 'premium') => void;
+  buyCarForInventory: (uid: string, catalogId: string, askPrice: string, condition: number) => boolean;
+  sellCarFromInventory: (uid: string, carUid: string, salePrice: string) => boolean;
+  collectCarBusiness: (uid: string, nowMs: number) => Money;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -55,6 +70,11 @@ export function aggregateIncomePerHour(state: GameState): Money {
     if (owned.level <= 0) continue;
     const t = businessTemplate(id);
     total = total.plus(levelIncomePerHour(t, owned.level));
+  }
+  for (const cb of state.carBusinesses) {
+    const spec = SPECIALIZATIONS.find((s) => s.id === cb.specialization);
+    if (!spec) continue;
+    total = total.plus(M(spec.baseHourlyPerVehicle).times(cb.inventory.length));
   }
   total = total.times(level.globalIncomeMultiplier);
   total = total.times(new Decimal(1).plus(new Decimal(state.prestigeStars).times('0.02')));
@@ -165,7 +185,7 @@ export const useGame = create<StoreState>((set, get) => ({
     return reward;
   },
 
-  buyBusiness: (templateId) => {
+  buyBusiness: (templateId, customName) => {
     const before = get().state;
     if (before.businesses[templateId] && before.businesses[templateId].level > 0) return false;
     const t = businessTemplate(templateId);
@@ -176,6 +196,7 @@ export const useGame = create<StoreState>((set, get) => ({
       draft.totalSpent = M(draft.totalSpent).plus(cost).toString();
       draft.businesses[templateId] = {
         templateId,
+        customName: customName?.trim() || undefined,
         level: 1,
         hasManager: false,
         lastCollectedAt: Date.now(),
@@ -234,25 +255,75 @@ export const useGame = create<StoreState>((set, get) => ({
     const owned = before.businesses[templateId];
     if (!owned || owned.level <= 0 || owned.hasManager) return ZERO;
     const t = businessTemplate(templateId);
-    const elapsedSec = (nowMs - owned.lastCollectedAt) / 1000;
-    if (elapsedSec < t.cycleSeconds) return ZERO;
+    const cycles = pendingCycles(t, owned.lastCollectedAt, nowMs);
+    if (cycles < 1) return ZERO;
     const playerLevel = computePlayerLevel(M(before.balance));
     const prestigeMult = new Decimal(1).plus(new Decimal(before.prestigeStars).times('0.02'));
     const businessMult = activeMultiplier(before.boosts, 'business_30', nowMs) * activeMultiplier(before.boosts, 'business_100', nowMs);
     const reward = levelIncomePerCycle(t, owned.level)
+      .times(cycles)
       .times(playerLevel.globalIncomeMultiplier)
       .times(prestigeMult)
       .times(businessMult);
     const next = produce(before, (draft) => {
       draft.balance = M(draft.balance).plus(reward).toString();
       draft.totalEarned = M(draft.totalEarned).plus(reward).toString();
-      draft.businesses[templateId].lastCollectedAt = nowMs;
+      draft.businesses[templateId].lastCollectedAt = owned.lastCollectedAt + cycles * t.cycleSeconds * 1000;
       draft.businesses[templateId].totalEarned = M(draft.businesses[templateId].totalEarned).plus(reward).toString();
       draft.taxAccrued = M(draft.taxAccrued).plus(reward.times('0.12')).toString();
     });
     set({ state: next });
     scheduleSave(next);
     return reward;
+  },
+
+  collectAllBusinesses: (nowMs) => {
+    const before = get().state;
+    const playerLevel = computePlayerLevel(M(before.balance));
+    const prestigeMult = new Decimal(1).plus(new Decimal(before.prestigeStars).times('0.02'));
+    const businessMult = activeMultiplier(before.boosts, 'business_30', nowMs) * activeMultiplier(before.boosts, 'business_100', nowMs);
+    let total = ZERO;
+    const updates: Record<string, { lastCollectedAt: number; addedEarned: Decimal }> = {};
+    for (const [id, owned] of Object.entries(before.businesses)) {
+      if (owned.level <= 0 || owned.hasManager) continue;
+      const t = businessTemplate(id);
+      const cycles = pendingCycles(t, owned.lastCollectedAt, nowMs);
+      if (cycles < 1) continue;
+      const reward = levelIncomePerCycle(t, owned.level)
+        .times(cycles)
+        .times(playerLevel.globalIncomeMultiplier)
+        .times(prestigeMult)
+        .times(businessMult);
+      total = total.plus(reward);
+      updates[id] = {
+        lastCollectedAt: owned.lastCollectedAt + cycles * t.cycleSeconds * 1000,
+        addedEarned: reward,
+      };
+    }
+    if (total.lte(0)) return ZERO;
+    const next = produce(before, (draft) => {
+      draft.balance = M(draft.balance).plus(total).toString();
+      draft.totalEarned = M(draft.totalEarned).plus(total).toString();
+      draft.taxAccrued = M(draft.taxAccrued).plus(total.times('0.12')).toString();
+      for (const [id, u] of Object.entries(updates)) {
+        draft.businesses[id].lastCollectedAt = u.lastCollectedAt;
+        draft.businesses[id].totalEarned = M(draft.businesses[id].totalEarned).plus(u.addedEarned).toString();
+      }
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return total;
+  },
+
+  renameBusiness: (templateId, name) => {
+    const before = get().state;
+    const trimmed = name.trim();
+    const next = produce(before, (draft) => {
+      if (!draft.businesses[templateId]) return;
+      draft.businesses[templateId].customName = trimmed || undefined;
+    });
+    set({ state: next });
+    scheduleSave(next);
   },
 
   buyStock: (ticker, qty, price) => {
@@ -371,6 +442,137 @@ export const useGame = create<StoreState>((set, get) => ({
     scheduleSave(next);
     return true;
   },
+
+  createCarBusiness: ({ name, showroomType, showroomSize, specialization }) => {
+    const before = get().state;
+    const size = SHOWROOM_SIZES.find((s) => s.id === showroomSize);
+    if (!size) return { ok: false, reason: 'Unknown size' };
+    const cost = M(showroomType === 'used' ? size.costUsed : size.costNew);
+    if (M(before.balance).lt(cost)) {
+      return { ok: false, reason: `Need ${cost.toString()} to open this showroom` };
+    }
+    const uid = `car-${Date.now()}`;
+    const next = produce(before, (draft) => {
+      draft.balance = M(draft.balance).minus(cost).toString();
+      draft.totalSpent = M(draft.totalSpent).plus(cost).toString();
+      draft.carBusinesses.push({
+        uid,
+        name: name.trim() || 'My Showroom',
+        showroomType,
+        showroomSize,
+        showroomCapacity: size.capacity,
+        serviceSize: null,
+        serviceCapacity: 0,
+        specialization,
+        skills: { engine: 1, transmission: 1, chassis: 1, body: 1 },
+        skillRepairs: { engine: 0, transmission: 0, chassis: 0, body: 0 },
+        inventory: [],
+        lastCollectedAt: Date.now(),
+        totalEarned: '0',
+        createdAt: Date.now(),
+      });
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return { ok: true, uid };
+  },
+
+  buyCarServiceForBusiness: (uid, size) => {
+    const before = get().state;
+    const ss = SERVICE_SIZES.find((s) => s.id === size);
+    if (!ss) return false;
+    const cost = M(ss.cost);
+    if (M(before.balance).lt(cost)) return false;
+    const idx = before.carBusinesses.findIndex((b) => b.uid === uid);
+    if (idx < 0) return false;
+    const next = produce(before, (draft) => {
+      draft.balance = M(draft.balance).minus(cost).toString();
+      draft.totalSpent = M(draft.totalSpent).plus(cost).toString();
+      draft.carBusinesses[idx].serviceSize = size;
+      draft.carBusinesses[idx].serviceCapacity = ss.capacity;
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return true;
+  },
+
+  setCarSpecialization: (uid, specialization) => {
+    const before = get().state;
+    const next = produce(before, (draft) => {
+      const idx = draft.carBusinesses.findIndex((b) => b.uid === uid);
+      if (idx >= 0) draft.carBusinesses[idx].specialization = specialization;
+    });
+    set({ state: next });
+    scheduleSave(next);
+  },
+
+  buyCarForInventory: (uid, catalogId, askPrice, condition) => {
+    const before = get().state;
+    const cost = M(askPrice);
+    if (M(before.balance).lt(cost)) return false;
+    const idx = before.carBusinesses.findIndex((b) => b.uid === uid);
+    if (idx < 0) return false;
+    if (before.carBusinesses[idx].inventory.length >= before.carBusinesses[idx].showroomCapacity) return false;
+    const item: CarInventoryItem = {
+      uid: `inv-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+      catalogId,
+      purchasePrice: askPrice,
+      askPrice,
+      condition,
+      acquiredAt: Date.now(),
+    };
+    const next = produce(before, (draft) => {
+      draft.balance = M(draft.balance).minus(cost).toString();
+      draft.totalSpent = M(draft.totalSpent).plus(cost).toString();
+      draft.carBusinesses[idx].inventory.push(item);
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return true;
+  },
+
+  sellCarFromInventory: (uid, carUid, salePrice) => {
+    const before = get().state;
+    const idx = before.carBusinesses.findIndex((b) => b.uid === uid);
+    if (idx < 0) return false;
+    const car = before.carBusinesses[idx].inventory.find((c) => c.uid === carUid);
+    if (!car) return false;
+    const sale = M(salePrice);
+    const next = produce(before, (draft) => {
+      draft.balance = M(draft.balance).plus(sale).toString();
+      draft.totalEarned = M(draft.totalEarned).plus(sale).toString();
+      draft.carBusinesses[idx].inventory = draft.carBusinesses[idx].inventory.filter((c) => c.uid !== carUid);
+      draft.carBusinesses[idx].totalEarned = M(draft.carBusinesses[idx].totalEarned).plus(sale).toString();
+      draft.taxAccrued = M(draft.taxAccrued).plus(sale.times('0.12')).toString();
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return true;
+  },
+
+  collectCarBusiness: (uid, nowMs) => {
+    const before = get().state;
+    const idx = before.carBusinesses.findIndex((b) => b.uid === uid);
+    if (idx < 0) return ZERO;
+    const cb = before.carBusinesses[idx];
+    const elapsedMs = nowMs - cb.lastCollectedAt;
+    if (elapsedMs < 1000) return ZERO;
+    const spec = SPECIALIZATIONS.find((s) => s.id === cb.specialization);
+    if (!spec) return ZERO;
+    const inventoryCount = cb.inventory.length;
+    const perHour = M(spec.baseHourlyPerVehicle).times(inventoryCount);
+    const gained = perHour.times(elapsedMs).div(3_600_000);
+    const next = produce(before, (draft) => {
+      draft.balance = M(draft.balance).plus(gained).toString();
+      draft.totalEarned = M(draft.totalEarned).plus(gained).toString();
+      draft.carBusinesses[idx].lastCollectedAt = nowMs;
+      draft.carBusinesses[idx].totalEarned = M(draft.carBusinesses[idx].totalEarned).plus(gained).toString();
+      draft.taxAccrued = M(draft.taxAccrued).plus(gained.times('0.12')).toString();
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return gained;
+  },
 }));
 
 function maxQty(baseCost: string, currentLevel: number, balance: Money): number {
@@ -390,6 +592,18 @@ export function computeNetworth(state: GameState): Money {
     if (owned.level <= 0) continue;
     const t = businessTemplate(id);
     total = total.plus(M(t.baseCost).times(new Decimal('1.07').pow(owned.level)));
+  }
+
+  for (const cb of state.carBusinesses) {
+    const sz = SHOWROOM_SIZES.find((s) => s.id === cb.showroomSize);
+    if (sz) total = total.plus(M(cb.showroomType === 'used' ? sz.costUsed : sz.costNew));
+    if (cb.serviceSize) {
+      const svc = SERVICE_SIZES.find((s) => s.id === cb.serviceSize);
+      if (svc) total = total.plus(M(svc.cost));
+    }
+    for (const car of cb.inventory) {
+      total = total.plus(M(car.askPrice));
+    }
   }
 
   for (const [ticker, owned] of Object.entries(state.stocks)) {
@@ -418,6 +632,17 @@ export function aggregateBySource(state: GameState): Record<string, Money> {
     if (owned.level <= 0) continue;
     const t = businessTemplate(id);
     businesses = businesses.plus(M(t.baseCost).times(new Decimal('1.07').pow(owned.level)));
+  }
+  for (const cb of state.carBusinesses) {
+    const sz = SHOWROOM_SIZES.find((s) => s.id === cb.showroomSize);
+    if (sz) businesses = businesses.plus(M(cb.showroomType === 'used' ? sz.costUsed : sz.costNew));
+    if (cb.serviceSize) {
+      const svc = SERVICE_SIZES.find((s) => s.id === cb.serviceSize);
+      if (svc) businesses = businesses.plus(M(svc.cost));
+    }
+    for (const car of cb.inventory) {
+      businesses = businesses.plus(M(car.askPrice));
+    }
   }
   let stocks = ZERO;
   for (const [ticker, owned] of Object.entries(state.stocks)) {

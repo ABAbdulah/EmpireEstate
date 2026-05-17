@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import { formatMoney, M } from '../../src/lib/money';
 import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
 import { Sparkline } from '../../src/components/Sparkline';
+import { NameBusinessSheet } from '../../src/components/NameBusinessSheet';
 
 const QTY_OPTIONS: Array<{ label: string; qty: number | 'max' }> = [
   { label: '×1', qty: 1 },
@@ -27,6 +28,8 @@ export default function BusinessDetail() {
   const hire = useGame((s) => s.hireManager);
   const collect = useGame((s) => s.collectBusiness);
   const addBoost = useGame((s) => s.addBoost);
+  const rename = useGame((s) => s.renameBusiness);
+  const [renameOpen, setRenameOpen] = useState(false);
 
   const template = useMemo(() => businessTemplate(id), [id]);
   const owned = state.businesses[id];
@@ -60,8 +63,10 @@ export default function BusinessDetail() {
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
             <Ionicons name="chevron-back" size={22} color={palette.textPrimary} />
           </Pressable>
-          <Text style={styles.headerTitle}>{template.name}</Text>
-          <View style={{ width: 36 }} />
+          <Text style={styles.headerTitle} numberOfLines={1}>{owned.customName || template.name}</Text>
+          <Pressable onPress={() => setRenameOpen(true)} style={styles.backBtn}>
+            <Ionicons name="create-outline" size={20} color={palette.textPrimary} />
+          </Pressable>
         </View>
 
         <View style={[styles.hero, { backgroundColor: sectorColor + '14' }]}>
@@ -69,7 +74,7 @@ export default function BusinessDetail() {
             <Ionicons name={template.icon} size={42} color="#FFFFFF" />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.heroSector}>{template.sector.toUpperCase()}</Text>
+            <Text style={styles.heroSector}>{template.name.toUpperCase()} · {template.sector.toUpperCase()}</Text>
             <Text style={styles.heroLevel}>Level {owned.level}</Text>
             <Text style={styles.heroIncome}>{formatMoney(incomePerHour)}/hr</Text>
           </View>
@@ -171,6 +176,14 @@ export default function BusinessDetail() {
 
         <View style={{ height: 24 }} />
       </ScrollView>
+      <NameBusinessSheet
+        visible={renameOpen}
+        template={template}
+        mode="rename"
+        initialName={owned.customName ?? ''}
+        onCancel={() => setRenameOpen(false)}
+        onConfirm={(name) => { rename(template.id, name); setRenameOpen(false); }}
+      />
     </SafeAreaView>
   );
 }

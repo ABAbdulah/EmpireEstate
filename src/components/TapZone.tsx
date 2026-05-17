@@ -24,7 +24,9 @@ export function TapZone({ onTap, hapticsEnabled = true }: Props) {
   const [floaters, setFloaters] = useState<Floater[]>([]);
   const idRef = useRef(0);
 
-  const handleTap = (evt: { nativeEvent: { locationX: number; locationY: number } }) => {
+  const handleTap = (evt: { nativeEvent?: { locationX?: number; locationY?: number } | null }) => {
+    const x = evt?.nativeEvent?.locationX ?? 0;
+    const y = evt?.nativeEvent?.locationY ?? 0;
     const reward = onTap();
     if (hapticsEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
     scale.value = withSequence(withSpring(0.96, { mass: 0.4, stiffness: 300 }), withSpring(1, { mass: 0.4, stiffness: 200 }));
@@ -32,7 +34,8 @@ export function TapZone({ onTap, hapticsEnabled = true }: Props) {
     ripple.value = withTiming(1, { duration: 500 });
 
     const id = ++idRef.current;
-    setFloaters((arr) => [...arr, { id, amount: '+' + formatMoney(reward), x: evt.nativeEvent.locationX, y: evt.nativeEvent.locationY }]);
+    const amount = '+' + formatMoney(reward);
+    setFloaters((arr) => [...arr, { id, amount, x, y }]);
     setTimeout(() => setFloaters((arr) => arr.filter((f) => f.id !== id)), 850);
   };
 

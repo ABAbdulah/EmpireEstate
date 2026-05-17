@@ -46,6 +46,20 @@ export function levelIncomePerHour(template: BusinessTemplate, level: number): M
   return perCycle.times(cyclesPerHour);
 }
 
+const MAX_PENDING_SECONDS = 8 * 3600; // 8h cap on accumulated pending cycles
+
+export function pendingCycles(template: BusinessTemplate, lastCollectedAt: number, nowMs: number): number {
+  const elapsedSec = Math.min((nowMs - lastCollectedAt) / 1000, MAX_PENDING_SECONDS);
+  if (elapsedSec < template.cycleSeconds) return 0;
+  return Math.floor(elapsedSec / template.cycleSeconds);
+}
+
+export function pendingReward(template: BusinessTemplate, level: number, lastCollectedAt: number, nowMs: number): Money {
+  const cycles = pendingCycles(template, lastCollectedAt, nowMs);
+  if (cycles <= 0) return ZERO;
+  return levelIncomePerCycle(template, level).times(cycles);
+}
+
 export interface PlayerLevel {
   level: number;
   title: string;

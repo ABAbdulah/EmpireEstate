@@ -1,5 +1,6 @@
 export interface OwnedBusiness {
   templateId: string;
+  customName?: string;
   level: number;
   hasManager: boolean;
   lastCollectedAt: number;
@@ -26,6 +27,32 @@ export interface OwnedItem {
   currentValueMultiplier: number;
 }
 
+export interface CarInventoryItem {
+  uid: string;
+  catalogId: string;
+  purchasePrice: string;
+  askPrice: string;
+  condition: number;
+  acquiredAt: number;
+}
+
+export interface CarBusiness {
+  uid: string;
+  name: string;
+  showroomType: 'used' | 'new';
+  showroomSize: 'small' | 'mid' | 'large';
+  showroomCapacity: number;
+  serviceSize: 'small' | 'mid' | 'large' | null;
+  serviceCapacity: number;
+  specialization: 'mass' | 'luxury' | 'premium';
+  skills: { engine: number; transmission: number; chassis: number; body: number };
+  skillRepairs: { engine: number; transmission: number; chassis: number; body: number };
+  inventory: CarInventoryItem[];
+  lastCollectedAt: number;
+  totalEarned: string;
+  createdAt: number;
+}
+
 export interface ActiveBoost {
   id: 'tap_2x' | 'business_30' | 'business_100';
   multiplier: number;
@@ -48,6 +75,7 @@ export interface GameState {
   prestigeCount: number;
 
   businesses: Record<string, OwnedBusiness>;
+  carBusinesses: CarBusiness[];
   stocks: Record<string, OwnedStock>;
   cryptos: Record<string, OwnedCrypto>;
   items: OwnedItem[];
@@ -84,6 +112,7 @@ export const INITIAL_STATE: GameState = {
   prestigeCount: 0,
 
   businesses: {},
+  carBusinesses: [],
   stocks: {},
   cryptos: {},
   items: [],
