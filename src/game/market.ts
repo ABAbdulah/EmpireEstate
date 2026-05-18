@@ -1,4 +1,5 @@
 import { STOCKS, CRYPTOS, StockTemplate, CryptoTemplate } from '../content/stocks';
+import { getDayNewsImpact } from '../content/newsTemplates';
 
 function hash32(s: string): number {
   let h = 2166136261 >>> 0;
@@ -23,14 +24,15 @@ function gauss(rnd: () => number): number {
   return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
 }
 
-function pricePath(template: { basePrice: number; volatility: number; drift: number }, key: string, atMs: number, steps = 24): number[] {
+function pricePath(template: { basePrice: number; volatility: number; drift: number; sector?: string }, key: string, atMs: number, steps = 24): number[] {
   const dayMs = 86_400_000;
   const day = Math.floor(atMs / dayMs);
+  const newsBias = template.sector ? getDayNewsImpact(template.sector, day) : 0;
   const rnd = mulberry32(hash32(`${key}-${day}`));
   const out: number[] = [];
   let price = template.basePrice * (1 + template.drift * (day - 19000));
   for (let i = 0; i < steps; i++) {
-    const r = template.drift / 24 + template.volatility / Math.sqrt(24) * gauss(rnd);
+    const r = (template.drift + newsBias) / 24 + template.volatility / Math.sqrt(24) * gauss(rnd);
     price = price * (1 + r);
     if (price < template.basePrice * 0.05) price = template.basePrice * 0.05;
     out.push(price);

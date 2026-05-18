@@ -1,15 +1,18 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useGame } from '../../../src/store/gameStore';
 import { palette, radius, shadow, spacing, typography } from '../../../src/theme';
 import { SKILLS, SkillKey } from '../../../src/content/carBusiness';
+import { formatMoney, M } from '../../../src/lib/money';
 
 export default function SkillsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const cb = useGame((s) => s.state.carBusinesses.find((b) => b.uid === id));
+  const balance = useGame((s) => s.state.balance);
+  const upgradeCarSkill = useGame((s) => s.upgradeCarSkill);
 
   if (!cb) return null;
 
@@ -28,16 +31,44 @@ export default function SkillsScreen() {
           const repairs = cb.skillRepairs[k];
           const level = cb.skills[k];
           const accuracy = 60 + Math.min(40, level * 5);
-          const nextLevelRepairs = level * 15;
+          const maxLevel = 10;
+          const atMax = level >= maxLevel;
+          const upgradeCost = M('50000').times(level * level);
+          const canAfford = M(balance).gte(upgradeCost);
           return (
-            <View key={skill.id} style={[styles.skillBlock, idx % 2 === 1 && { backgroundColor: palette.surfaceAlt }]}>
+            <View key={skill.id} style={styles.skillBlock}>
               <View style={styles.skillHeader}>
-                <Ionicons name={skill.icon} size={28} color={palette.textPrimary} />
-                <Text style={styles.skillLabel}>{skill.label}</Text>
+                <View style={styles.skillIconBox}>
+                  <Ionicons name={skill.icon} size={22} color={palette.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.skillLabel}>{skill.label}</Text>
+                  <Text style={styles.skillDesc}>{skill.description}</Text>
+                </View>
+                <View style={styles.levelBadge}>
+                  <Text style={styles.levelBadgeText}>Lv {level}</Text>
+                </View>
               </View>
-              <SkillStat icon="construct-outline" value={repairs.toString()} label="Number of repairs performed" />
-              <SkillStat icon="speedometer-outline" value={`${accuracy}%`} label="Accuracy of condition prediction" />
-              <SkillStat icon="bar-chart-outline" value={`${nextLevelRepairs} repairs`} label="Next level" />
+
+              <View style={styles.levelBarTrack}>
+                <View style={[styles.levelBarFill, { width: `${(level / maxLevel) * 100}%` }]} />
+              </View>
+
+              <SkillStat icon="speedometer-outline" value={`${accuracy}%`} label="Condition prediction accuracy" />
+              <SkillStat icon="construct-outline" value={repairs.toString()} label="Repairs performed" />
+
+              <Pressable
+                disabled={atMax || !canAfford}
+                style={[styles.upgradeBtn, (atMax || !canAfford) && styles.upgradeBtnDisabled]}
+                onPress={() => {
+                  const ok = upgradeCarSkill(cb.uid, k);
+                  if (!ok) Alert.alert("Can't upgrade", canAfford ? 'Already at max level.' : `Need ${formatMoney(upgradeCost)} to upgrade.`);
+                }}
+              >
+                <Text style={[styles.upgradeBtnText, (atMax || !canAfford) && styles.upgradeBtnTextDisabled]}>
+                  {atMax ? 'Max level' : `Upgrade · ${formatMoney(upgradeCost)}`}
+                </Text>
+              </Pressable>
             </View>
           );
         })}
@@ -65,9 +96,19 @@ const styles = StyleSheet.create({
   backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   heading: { ...typography.hero, color: palette.textPrimary },
   skillBlock: { padding: spacing.lg, backgroundColor: palette.surface, borderRadius: radius.lg, gap: spacing.md, ...shadow.card },
-  skillHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.sm },
-  skillLabel: { ...typography.headline, color: palette.textPrimary },
+  skillHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  skillIconBox: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: palette.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  skillLabel: { ...typography.bodyMedium, color: palette.textPrimary, fontWeight: '700' },
+  skillDesc: { ...typography.caption, color: palette.textSecondary, marginTop: 2 },
+  levelBadge: { paddingHorizontal: spacing.sm, paddingVertical: 4, borderRadius: radius.pill, backgroundColor: palette.primarySoft },
+  levelBadgeText: { ...typography.caption, color: palette.primary, fontWeight: '700' },
+  levelBarTrack: { height: 6, borderRadius: 3, backgroundColor: palette.surfaceAlt, overflow: 'hidden' },
+  levelBarFill: { height: '100%', backgroundColor: palette.primary, borderRadius: 3 },
   statRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   statValue: { ...typography.title, color: palette.textPrimary },
   statLabel: { ...typography.caption, color: palette.textSecondary },
+  upgradeBtn: { backgroundColor: palette.primary, borderRadius: radius.pill, paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.xs },
+  upgradeBtnDisabled: { backgroundColor: palette.surfaceAlt },
+  upgradeBtnText: { ...typography.bodyMedium, color: '#FFFFFF', fontWeight: '700' },
+  upgradeBtnTextDisabled: { color: palette.textTertiary },
 });

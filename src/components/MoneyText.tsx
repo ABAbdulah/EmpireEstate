@@ -13,17 +13,20 @@ interface Props extends TextProps {
 
 export function MoneyText({ value, animate = true, durationMs = 350, style, prefix = '$', ...rest }: Props) {
   const target = new Decimal(value);
-  const prevRef = useRef<Decimal>(target);
+  // Tracks the value currently shown on screen (updated every animation frame).
+  // Using this as the animation start point prevents "jumping back" when rapid
+  // taps trigger new animations before the previous one finishes.
+  const displayedRef = useRef<Decimal>(target);
   const [display, setDisplay] = useState<string>(formatMoney(target, { prefix }));
 
   useEffect(() => {
     if (!animate) {
-      prevRef.current = target;
+      displayedRef.current = target;
       setDisplay(formatMoney(target, { prefix }));
       return;
     }
     const start = performance.now();
-    const from = prevRef.current;
+    const from = displayedRef.current;
     const to = target;
     const diff = to.minus(from);
     if (diff.isZero()) {
@@ -35,9 +38,10 @@ export function MoneyText({ value, animate = true, durationMs = 350, style, pref
       const k = Math.min(1, (t - start) / durationMs);
       const eased = 1 - Math.pow(1 - k, 3);
       const curr = from.plus(diff.times(eased));
+      displayedRef.current = curr;
       setDisplay(formatMoney(curr, { prefix }));
       if (k < 1) raf = requestAnimationFrame(step);
-      else prevRef.current = to;
+      else displayedRef.current = to;
     };
     raf = requestAnimationFrame(step);
     return () => cancelAnimationFrame(raf);

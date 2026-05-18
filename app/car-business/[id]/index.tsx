@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable, Alert, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,7 +7,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useGame } from '../../../src/store/gameStore';
 import { palette, radius, shadow, spacing, typography } from '../../../src/theme';
 import { formatMoney, M } from '../../../src/lib/money';
-import { SPECIALIZATIONS, SERVICE_SIZES } from '../../../src/content/carBusiness';
+import { SPECIALIZATIONS, SERVICE_SIZES, CAR_CATALOG } from '../../../src/content/carBusiness';
 import { BottomSheet } from '../../../src/components/BottomSheet';
 import { Button } from '../../../src/components/Button';
 
@@ -36,6 +36,7 @@ export default function CarBusinessDetail() {
   }
 
   const spec = SPECIALIZATIONS.find((s) => s.id === cb.specialization)!;
+  const specEmoji = cb.specialization === 'premium' ? '🏎️' : cb.specialization === 'luxury' ? '🚗' : '🚙';;
   const hourly = M(spec.baseHourlyPerVehicle).times(cb.inventory.length);
   const pending = useMemo(() => {
     const elapsed = (Date.now() - cb.lastCollectedAt) / 1000;
@@ -56,7 +57,7 @@ export default function CarBusinessDetail() {
           </View>
           <View style={styles.headerCenter}>
             <View style={styles.headerIcon}>
-              <Ionicons name="car-sport" size={28} color="#FFFFFF" />
+              <Text style={styles.headerEmoji}>{specEmoji}</Text>
             </View>
             <Text style={styles.headerName}>{cb.name}</Text>
           </View>
@@ -102,8 +103,30 @@ export default function CarBusinessDetail() {
           <View style={styles.showroomTotal}>
             <Ionicons name="receipt-outline" size={20} color="rgba(255,255,255,0.85)" />
             <Text style={styles.showroomTotalValue}>{formatMoney(cb.inventory.reduce((sum, c) => sum + Number(c.askPrice), 0))}</Text>
-            <Text style={styles.showroomTotalLabel}>Total cost of vehicles</Text>
+            <Text style={styles.showroomTotalLabel}>Total value of stock</Text>
           </View>
+          {cb.inventory.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.fleetScroll} contentContainerStyle={styles.fleetRow}>
+              {cb.inventory.map((car) => {
+                const tmpl = CAR_CATALOG.find((c) => c.id === car.catalogId);
+                return (
+                  <View key={car.uid} style={styles.fleetItem}>
+                    <View style={styles.fleetBox}>
+                      {tmpl?.imageUrl ? (
+                        <Image source={{ uri: tmpl.imageUrl }} style={styles.fleetImage} resizeMode="cover" />
+                      ) : (
+                        <Text style={styles.fleetEmoji}>{tmpl?.emoji ?? '🚗'}</Text>
+                      )}
+                    </View>
+                    <Text style={styles.fleetName} numberOfLines={1}>{tmpl?.name ?? 'Vehicle'}</Text>
+                    <Text style={styles.fleetPrice}>{formatMoney(Number(car.askPrice))}</Text>
+                  </View>
+                );
+              })}
+            </ScrollView>
+          ) : (
+            <Text style={styles.fleetEmpty}>No vehicles yet — visit the market to buy stock</Text>
+          )}
         </LinearGradient>
 
         <View style={styles.quickGrid}>
@@ -111,8 +134,8 @@ export default function CarBusinessDetail() {
             style={styles.quickTile}
             onPress={() => router.push(`/car-business/${cb.uid}/market` as any)}
           >
-            <Ionicons name="car-outline" size={40} color={palette.textSecondary} />
-            <Text style={styles.quickTileTitle}>Used car market</Text>
+            <Text style={styles.marketEmoji}>🚘</Text>
+            <Text style={styles.quickTileTitle}>Vehicle market</Text>
           </Pressable>
           <Pressable style={styles.quickTile} onPress={() => setSpecSheet(true)}>
             <Text style={styles.quickTileTitle}>Specialization</Text>
@@ -243,6 +266,7 @@ const styles = StyleSheet.create({
   settingsBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   headerCenter: { alignItems: 'center', marginTop: spacing.sm, gap: spacing.sm },
   headerIcon: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#1F2937', alignItems: 'center', justifyContent: 'center' },
+  headerEmoji: { fontSize: 32 },
   headerName: { ...typography.title, color: '#FFFFFF' },
   pendingCard: { marginHorizontal: spacing.lg, marginTop: -spacing.lg, padding: spacing.lg, backgroundColor: palette.surface, borderRadius: radius.lg, alignItems: 'center', ...shadow.card },
   pendingValue: { ...typography.hero, color: palette.textPrimary },
@@ -266,6 +290,16 @@ const styles = StyleSheet.create({
   showroomTotal: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: radius.md },
   showroomTotalValue: { ...typography.title, color: '#FFFFFF' },
   showroomTotalLabel: { ...typography.caption, color: 'rgba(255,255,255,0.6)' },
+  marketEmoji: { fontSize: 38 },
+  fleetScroll: { marginTop: spacing.md },
+  fleetRow: { gap: spacing.sm, paddingBottom: spacing.xs },
+  fleetItem: { alignItems: 'center', width: 80, gap: 4 },
+  fleetBox: { width: 60, height: 60, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  fleetImage: { width: 60, height: 60 },
+  fleetEmoji: { fontSize: 32 },
+  fleetName: { ...typography.micro, color: 'rgba(255,255,255,0.8)', textAlign: 'center', width: 80 },
+  fleetPrice: { ...typography.micro, color: '#10B981', fontWeight: '700' },
+  fleetEmpty: { ...typography.micro, color: 'rgba(255,255,255,0.5)', textAlign: 'center', paddingVertical: spacing.sm },
   quickGrid: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg, marginTop: spacing.lg },
   quickTile: { flex: 1, padding: spacing.lg, backgroundColor: palette.surfaceAlt, borderRadius: radius.lg, minHeight: 140, justifyContent: 'space-between' },
   quickTileLight: { flex: 1, padding: spacing.lg, backgroundColor: palette.surface, borderRadius: radius.lg, minHeight: 130, alignItems: 'center', gap: spacing.sm, ...shadow.card },

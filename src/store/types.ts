@@ -19,6 +19,15 @@ export interface OwnedCrypto {
   avgCost: string;
 }
 
+export interface OwnedProperty {
+  uid: string;
+  templateId: string;
+  purchasePrice: string;
+  purchasedAt: number;
+  upgrades: string[]; // applied upgrade IDs
+  totalEarned: string;
+}
+
 export interface OwnedItem {
   uid: string;
   templateId: string;
@@ -78,6 +87,7 @@ export interface GameState {
   carBusinesses: CarBusiness[];
   stocks: Record<string, OwnedStock>;
   cryptos: Record<string, OwnedCrypto>;
+  properties: OwnedProperty[];
   items: OwnedItem[];
   collections: Record<string, string[]>;
 
@@ -85,6 +95,8 @@ export interface GameState {
   taxAccrued: string;
 
   boosts: ActiveBoost[];
+
+  completedMergers: string[];
 
   settings: {
     sound: boolean;
@@ -115,6 +127,7 @@ export const INITIAL_STATE: GameState = {
   carBusinesses: [],
   stocks: {},
   cryptos: {},
+  properties: [],
   items: [],
   collections: {},
 
@@ -122,6 +135,8 @@ export const INITIAL_STATE: GameState = {
   taxAccrued: '0',
 
   boosts: [],
+
+  completedMergers: [],
 
   settings: {
     sound: false,

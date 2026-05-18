@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, Pressable, TextInput, Alert } from 'react-native';
+import { StyleSheet, Text, View, Pressable, TextInput, Alert, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { BottomSheet } from './BottomSheet';
@@ -7,13 +7,15 @@ import { palette, radius, spacing, typography, shadow } from '../theme';
 import { Button } from './Button';
 import { useGame } from '../store/gameStore';
 import { SHOWROOM_SIZES, SPECIALIZATIONS } from '../content/carBusiness';
+import { BUSINESSES, BusinessTemplate, SECTOR_COLORS } from '../content/businesses';
 import { formatMoney, M } from '../lib/money';
 
-type Step = 'category' | 'showroomType' | 'showroomSize' | 'specialization' | 'name';
+type Step = 'category' | 'quickList' | 'showroomType' | 'showroomSize' | 'specialization' | 'name';
 
 interface Props {
   visible: boolean;
   onClose: () => void;
+  onStartQuick: (template: BusinessTemplate) => void;
 }
 
 interface Draft {
@@ -26,10 +28,11 @@ interface Draft {
 
 const EMPTY: Draft = { category: null, showroomType: null, showroomSize: null, specialization: null, name: '' };
 
-export function StartBusinessSheet({ visible, onClose }: Props) {
+export function StartBusinessSheet({ visible, onClose, onStartQuick }: Props) {
   const [step, setStep] = useState<Step>('category');
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const balance = useGame((s) => s.state.balance);
+  const state = useGame((s) => s.state);
   const create = useGame((s) => s.createCarBusiness);
 
   const reset = () => { setStep('category'); setDraft(EMPTY); };
@@ -43,7 +46,18 @@ export function StartBusinessSheet({ visible, onClose }: Props) {
           onPick={(c) => {
             setDraft((d) => ({ ...d, category: c }));
             if (c === 'car') setStep('showroomType');
-            else { close(); }
+            else setStep('quickList');
+          }}
+        />
+      ) : null}
+      {step === 'quickList' ? (
+        <QuickListStep
+          balance={balance}
+          state={state}
+          onBack={() => setStep('category')}
+          onPick={(t) => {
+            close();
+            onStartQuick(t);
           }}
         />
       ) : null}
@@ -108,7 +122,7 @@ function CategoryStep({ onPick, onClose }: { onPick: (c: 'car' | 'quick') => voi
         </View>
         <Ionicons name="chevron-forward" size={20} color={palette.textTertiary} />
       </Pressable>
-      <Pressable style={[styles.optionCard, styles.optionCardDisabled]} onPress={() => Alert.alert('Tip', 'Quick businesses are in the list on the Business tab — tap any locked card to start it.')}>
+      <Pressable style={styles.optionCard} onPress={() => onPick('quick')}>
         <View style={[styles.optionIcon, { backgroundColor: palette.primary }]}>
           <Ionicons name="business" size={28} color="#FFFFFF" />
         </View>
@@ -118,17 +132,100 @@ function CategoryStep({ onPick, onClose }: { onPick: (c: 'car' | 'quick') => voi
         </View>
         <Ionicons name="chevron-forward" size={20} color={palette.textTertiary} />
       </Pressable>
-      <Pressable style={[styles.optionCard, styles.optionCardDisabled]}>
-        <View style={[styles.optionIcon, { backgroundColor: '#9B6FB0' }]}>
-          <Ionicons name="restaurant" size={28} color="#FFFFFF" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.optionTitle}>Restaurant Chain</Text>
-          <Text style={styles.optionSubtitle}>Coming soon</Text>
-        </View>
-      </Pressable>
       <View style={{ height: spacing.md }} />
       <Button label="Cancel" variant="ghost" onPress={onClose} />
+    </View>
+  );
+}
+
+function QuickListStep({
+  balance,
+  state,
+  onBack,
+  onPick,
+}: {
+  balance: string;
+  state: ReturnType<typeof useGame.getState>['state'];
+  onBack: () => void;
+  onPick: (t: BusinessTemplate) => void;
+}) {
+  const owned = new Set(
+    Object.entries(state.businesses)
+      .filter(([, b]) => b.level > 0)
+      .map(([id]) => id)
+  );
+
+  const available = BUSINESSES.filter(
+    (b) => !owned.has(b.id) && M(state.balance).gte(b.unlockNetworth ?? '0')
+  );
+  const locked = BUSINESSES.filter(
+    (b) => !owned.has(b.id) && M(state.balance).lt(b.unlockNetworth ?? '0')
+  );
+
+  return (
+    <View style={{ flex: 1 }}>
+      <StepHeader title="Quick Industry" subtitle="Pick a business to launch" onBack={onBack} />
+      <ScrollView style={styles.quickScroll} showsVerticalScrollIndicator={false}>
+        {available.length > 0 ? (
+          <>
+            <Text style={styles.listSection}>Available now</Text>
+            {available.map((t) => {
+              const canAfford = M(balance).gte(t.baseCost);
+              const sectorColor = SECTOR_COLORS[t.sector] ?? palette.primary;
+              return (
+                <Pressable
+                  key={t.id}
+                  style={[styles.bizRow, !canAfford && styles.bizRowDim]}
+                  onPress={() => onPick(t)}
+                >
+                  <View style={[styles.bizIcon, { backgroundColor: t.color + '22' }]}>
+                    <Ionicons name={t.icon} size={22} color={t.color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.bizName}>{t.name}</Text>
+                    <View style={styles.bizMeta}>
+                      <View style={[styles.sectorDot, { backgroundColor: sectorColor }]} />
+                      <Text style={styles.bizSector}>{t.sector}</Text>
+                    </View>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[styles.bizCost, !canAfford && styles.bizCostRed]}>
+                      {formatMoney(t.baseCost)}
+                    </Text>
+                    <Text style={styles.bizIncome}>{formatMoney(t.baseIncome)}/cycle</Text>
+                  </View>
+                </Pressable>
+              );
+            })}
+          </>
+        ) : null}
+
+        {locked.length > 0 ? (
+          <>
+            <Text style={[styles.listSection, { marginTop: spacing.md }]}>Locked</Text>
+            {locked.map((t) => (
+              <View key={t.id} style={[styles.bizRow, styles.bizRowLocked]}>
+                <View style={[styles.bizIcon, { backgroundColor: palette.surfaceAlt }]}>
+                  <Ionicons name="lock-closed-outline" size={20} color={palette.textTertiary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.bizNameLocked}>{t.name}</Text>
+                  <Text style={styles.bizUnlock}>Unlocks at {formatMoney(t.unlockNetworth)} networth</Text>
+                </View>
+              </View>
+            ))}
+          </>
+        ) : null}
+
+        {available.length === 0 && locked.length === 0 ? (
+          <View style={styles.allOwned}>
+            <Ionicons name="checkmark-circle" size={32} color={palette.success} />
+            <Text style={styles.allOwnedText}>You own all businesses!</Text>
+          </View>
+        ) : null}
+
+        <View style={{ height: 20 }} />
+      </ScrollView>
     </View>
   );
 }
@@ -275,6 +372,34 @@ const styles = StyleSheet.create({
   optionSubtitle: { ...typography.caption, color: palette.textSecondary, marginTop: 2 },
   stepHeader: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start', marginBottom: spacing.md },
   backBtn: { width: 36, height: 36, borderRadius: 12, backgroundColor: palette.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  // Quick list
+  quickScroll: { maxHeight: 420 },
+  listSection: { ...typography.caption, color: palette.textTertiary, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: spacing.sm },
+  bizRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: palette.surfaceAlt,
+    borderRadius: radius.md,
+    marginBottom: spacing.xs,
+  },
+  bizRowDim: { opacity: 0.6 },
+  bizRowLocked: { opacity: 0.45 },
+  bizIcon: { width: 40, height: 40, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  bizName: { ...typography.bodyMedium, color: palette.textPrimary, fontWeight: '600' },
+  bizNameLocked: { ...typography.bodyMedium, color: palette.textTertiary },
+  bizMeta: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 2 },
+  sectorDot: { width: 6, height: 6, borderRadius: 3 },
+  bizSector: { ...typography.micro, color: palette.textTertiary, textTransform: 'capitalize' },
+  bizCost: { ...typography.caption, color: palette.textPrimary, fontWeight: '700' },
+  bizCostRed: { color: palette.danger },
+  bizIncome: { ...typography.micro, color: palette.textSecondary, marginTop: 2 },
+  bizUnlock: { ...typography.micro, color: palette.textTertiary, marginTop: 2 },
+  allOwned: { alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.xl },
+  allOwnedText: { ...typography.bodyMedium, color: palette.textSecondary },
+  // Showroom
   sizeCard: {
     flexDirection: 'row',
     alignItems: 'center',

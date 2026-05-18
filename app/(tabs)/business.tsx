@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { ScrollView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +15,8 @@ import { Button } from '../../src/components/Button';
 import { StartBusinessSheet } from '../../src/components/StartBusinessSheet';
 import { NameBusinessSheet } from '../../src/components/NameBusinessSheet';
 import { router } from 'expo-router';
+import { useRewardedAd } from '../../src/hooks/useRewardedAd';
+import { useInterstitialAd } from '../../src/hooks/useInterstitialAd';
 
 export default function BusinessScreen() {
   const state = useGame((s) => s.state);
@@ -22,7 +24,16 @@ export default function BusinessScreen() {
   const collect = useGame((s) => s.collectBusiness);
   const collectAll = useGame((s) => s.collectAllBusinesses);
   const hire = useGame((s) => s.hireManager);
+  const addBoost = useGame((s) => s.addBoost);
   const bottomPad = useBottomPadding();
+
+  const onRewarded = useCallback(() => {
+    addBoost({ id: 'business_30', multiplier: 1.3, endsAt: Date.now() + 4 * 3600_000 });
+    Alert.alert('Boost active!', '+30% income for 4 hours.');
+  }, [addBoost]);
+
+  const { adState, show: showRewardedAd } = useRewardedAd(onRewarded);
+  const { onAction: onInterstitialAction } = useInterstitialAd();
 
   const [startOpen, setStartOpen] = useState(false);
   const [nameOpen, setNameOpen] = useState<BusinessTemplate | null>(null);
@@ -70,7 +81,7 @@ export default function BusinessScreen() {
           <Text style={styles.incomeValue}>{formatMoney(incomePerHour)}</Text>
           <Text style={styles.incomeLabel}>Total income per hour</Text>
           {totalPending.gt(0.01) ? (
-            <Pressable style={styles.pendingRow} onPress={() => collectAll(Date.now())}>
+            <Pressable style={styles.pendingRow} onPress={() => { collectAll(Date.now()); onInterstitialAction(); }}>
               <View style={styles.pendingDot} />
               <Text style={styles.pendingLabel}>Pending collection</Text>
               <Text style={styles.pendingValue}>{formatMoney(totalPending)}</Text>
@@ -79,9 +90,12 @@ export default function BusinessScreen() {
               </View>
             </Pressable>
           ) : null}
-          <Pressable style={styles.raisePill} onPress={() => useGame.getState().addBoost({ id: 'business_30', multiplier: 1.3, endsAt: Date.now() + 4 * 3600_000 })}>
+          <Pressable
+            style={[styles.raisePill, adState !== 'ready' && { opacity: 0.5 }]}
+            onPress={adState === 'ready' ? showRewardedAd : undefined}
+          >
             <Ionicons name="play" size={12} color={palette.primary} />
-            <Text style={styles.raiseLabel}>Ad</Text>
+            <Text style={styles.raiseLabel}>{adState === 'loading' ? 'Loading…' : (adState === 'error' || adState === 'unavailable') ? 'Ad' : 'Ad'}</Text>
             <View style={{ width: 1, height: 14, backgroundColor: palette.border, marginHorizontal: 8 }} />
             <Text style={styles.raiseText}>Raise income (+30% for 4h)</Text>
           </Pressable>
@@ -89,7 +103,7 @@ export default function BusinessScreen() {
 
         <View style={styles.actionRow}>
           <Button label="Start a business" onPress={() => setStartOpen(true)} style={{ flex: 1 }} />
-          <Button label="Business mergers" variant="secondary" onPress={() => Alert.alert('Coming soon', 'Mergers unlock after 5 owned businesses.')} style={{ flex: 1 }} />
+          <Button label="Business mergers" variant="secondary" onPress={() => router.push('/mergers' as any)} style={{ flex: 1 }} />
         </View>
 
         {state.carBusinesses.length > 0 ? (
@@ -105,7 +119,7 @@ export default function BusinessScreen() {
                   onPress={() => router.push(`/car-business/${cb.uid}` as any)}
                 >
                   <View style={styles.carIconWrap}>
-                    <Ionicons name="car-sport" size={22} color="#FFFFFF" />
+                    <Text style={styles.carEmoji}>{cb.specialization === 'premium' ? '🏎️' : cb.specialization === 'luxury' ? '🚗' : '🚙'}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.carName}>{cb.name}</Text>
@@ -172,7 +186,11 @@ export default function BusinessScreen() {
         ) : null}
       </ScrollView>
 
-      <StartBusinessSheet visible={startOpen} onClose={() => setStartOpen(false)} />
+      <StartBusinessSheet
+        visible={startOpen}
+        onClose={() => setStartOpen(false)}
+        onStartQuick={(t) => setNameOpen(t)}
+      />
       <NameBusinessSheet
         visible={!!nameOpen}
         template={nameOpen}
@@ -214,6 +232,7 @@ const styles = StyleSheet.create({
   sectionMeta: { ...typography.caption, color: palette.textSecondary },
   carRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, backgroundColor: palette.surface, borderRadius: radius.lg, ...shadow.card },
   carIconWrap: { width: 44, height: 44, borderRadius: 12, backgroundColor: '#374151', alignItems: 'center', justifyContent: 'center' },
+  carEmoji: { fontSize: 22 },
   carName: { ...typography.title, color: palette.textPrimary },
   carMeta: { ...typography.micro, color: palette.textTertiary, marginTop: 2 },
   carInventory: { ...typography.caption, color: palette.success, marginTop: 4 },

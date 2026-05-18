@@ -37,9 +37,10 @@ export function formatMoney(value: Decimal.Value, opts?: { prefix?: string; deci
   }
 
   if (abs.lt(1_000_000)) {
-    const s = abs.toFixed(0);
-    const grouped = s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-    return `${neg ? '-' : ''}${prefix}${grouped}`;
+    const s = abs.toFixed(2);
+    const [int, frac] = s.split('.');
+    const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return `${neg ? '-' : ''}${prefix}${grouped}${frac ? '.' + frac : ''}`;
   }
 
   for (const { value: threshold, symbol } of SUFFIXES) {

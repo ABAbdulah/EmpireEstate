@@ -35,6 +35,16 @@ export default function RootLayout() {
           <Stack.Screen name="car-business/[id]/index" options={{ presentation: 'card', animation: 'slide_from_right' }} />
           <Stack.Screen name="car-business/[id]/market" options={{ presentation: 'card', animation: 'slide_from_right' }} />
           <Stack.Screen name="car-business/[id]/skills" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+          <Stack.Screen name="investing/portfolio" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+          <Stack.Screen name="investing/stocks" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+          <Stack.Screen name="investing/stock/[ticker]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+          <Stack.Screen name="investing/crypto/[symbol]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+          <Stack.Screen name="investing/buy-property" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+          <Stack.Screen name="investing/my-property" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+          <Stack.Screen name="investing/property/[uid]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+          <Stack.Screen name="prestige" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+          <Stack.Screen name="settings" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+          <Stack.Screen name="mergers" options={{ presentation: 'card', animation: 'slide_from_right' }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

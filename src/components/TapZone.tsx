@@ -49,7 +49,7 @@ export function TapZone({ onTap, hapticsEnabled = true }: Props) {
   }));
 
   return (
-    <Pressable onPress={handleTap} style={styles.tapArea}>
+    <Pressable onPressIn={handleTap} delayLongPress={500} style={styles.tapArea}>
       <Animated.View style={[styles.ripple, rippleStyle]} pointerEvents="none" />
       <Animated.View style={[styles.handWrap, handStyle]}>
         <View style={styles.handCircle}>

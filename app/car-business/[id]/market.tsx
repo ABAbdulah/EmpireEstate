@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable, Alert, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -57,9 +57,7 @@ export default function UsedCarMarket() {
           const full = cb.inventory.length >= cb.showroomCapacity;
           return (
             <View key={`${offer.id}-${i}`} style={styles.carCard}>
-              <View style={styles.carImageBox}>
-                <Text style={styles.carEmoji}>{offer.emoji}</Text>
-              </View>
+              <CarImage imageUrl={offer.imageUrl} emoji={offer.emoji} />
               <View style={{ flex: 1, gap: 4 }}>
                 <Text style={styles.carName}>{offer.name}</Text>
                 <View>
@@ -86,6 +84,24 @@ export default function UsedCarMarket() {
         <View style={{ height: 80 }} />
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function CarImage({ imageUrl, emoji }: { imageUrl: string; emoji: string }) {
+  const [imgFailed, setImgFailed] = useState(false);
+  return (
+    <View style={styles.carImageBox}>
+      {!imgFailed ? (
+        <Image
+          source={{ uri: imageUrl }}
+          style={styles.carImage}
+          resizeMode="cover"
+          onError={() => setImgFailed(true)}
+        />
+      ) : (
+        <Text style={styles.carEmoji}>{emoji}</Text>
+      )}
+    </View>
   );
 }
 
@@ -120,7 +136,8 @@ const styles = StyleSheet.create({
   chipLabelActive: { color: '#FFFFFF' },
   list: { paddingHorizontal: spacing.lg, gap: spacing.md },
   carCard: { flexDirection: 'row', gap: spacing.md, padding: spacing.md, backgroundColor: palette.surface, borderRadius: radius.lg, alignItems: 'center', ...shadow.card },
-  carImageBox: { width: 90, height: 70, borderRadius: radius.md, backgroundColor: palette.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  carImageBox: { width: 90, height: 80, borderRadius: radius.md, backgroundColor: palette.surfaceAlt, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  carImage: { width: 90, height: 80 },
   carEmoji: { fontSize: 38 },
   carName: { ...typography.bodyMedium, color: palette.textPrimary, fontWeight: '600' },
   conditionLabel: { ...typography.micro, color: palette.textTertiary },

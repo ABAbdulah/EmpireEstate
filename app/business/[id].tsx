@@ -1,12 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import Decimal from 'decimal.js';
 import { useGame } from '../../src/store/gameStore';
 import { businessTemplate, levelIncomePerCycle, levelIncomePerHour, upgradeCost } from '../../src/game/economy';
-import { SECTOR_COLORS } from '../../src/content/businesses';
+import { SECTOR_COLORS, IT_EMPLOYEES, getItEmployeeCounts, getItTotalWagePerHr, getItProjects } from '../../src/content/businesses';
 import { palette, radius, shadow, spacing, typography } from '../../src/theme';
 import { formatMoney, M } from '../../src/lib/money';
 import { Button } from '../../src/components/Button';
@@ -38,12 +39,31 @@ export default function BusinessDetail() {
   if (!owned) {
     return (
       <SafeAreaView style={styles.root}>
-        <Text>Business not owned.</Text>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ color: palette.textSecondary }}>Business not owned.</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
-  const sectorColor = SECTOR_COLORS[template.sector];
+  if (template.businessType === 'it_company') {
+    return (
+      <ItCompanyDetail
+        id={id}
+        owned={owned}
+        template={template}
+        balance={balance}
+        renameOpen={renameOpen}
+        setRenameOpen={setRenameOpen}
+        upgrade={upgrade}
+        hire={hire}
+        collect={collect}
+        rename={rename}
+      />
+    );
+  }
+
+  const sectorColor = SECTOR_COLORS[template.sector] ?? palette.primary;
   const cycleReward = levelIncomePerCycle(template, owned.level);
   const incomePerHour = levelIncomePerHour(template, owned.level);
   const fakeChart = useMemo(() => {
@@ -188,6 +208,229 @@ export default function BusinessDetail() {
   );
 }
 
+// ─── IT Company special screen ────────────────────────────────────────────────
+
+function ItCompanyDetail({
+  id, owned, template, balance, renameOpen, setRenameOpen, upgrade, hire, collect, rename,
+}: {
+  id: string;
+  owned: any;
+  template: any;
+  balance: any;
+  renameOpen: boolean;
+  setRenameOpen: (v: boolean) => void;
+  upgrade: any;
+  hire: any;
+  collect: any;
+  rename: any;
+}) {
+  const level = owned.level;
+  const empCounts = useMemo(() => getItEmployeeCounts(level), [level]);
+  const totalWage = useMemo(() => getItTotalWagePerHr(level), [level]);
+  const projects = useMemo(() => getItProjects(level), [level]);
+  const incomePerHour = levelIncomePerHour(template, level);
+  const pendingEarnings = incomePerHour.div(3600).times(Math.max(0, (Date.now() - owned.lastCollectedAt) / 1000));
+  const totalStaff = Object.values(empCounts).reduce((a, b) => a + b, 0);
+  const officeCapacity = Math.max(5, Math.ceil(totalStaff / 5) * 5);
+  const completedProjects = Math.max(0, Math.floor(level / 8));
+  const activeProjects = level > 0 ? 1 : 0;
+
+  // Next employee type and hire cost
+  const nextEmpType = IT_EMPLOYEES.find((e) => level >= e.levelStart - 1 && level < e.levelEnd);
+  const hireCost = upgradeCost(template, level, 1);
+  const canHire = balance.gte(hireCost) && level < template.maxLevel;
+
+  return (
+    <SafeAreaView style={styles.root} edges={['top']}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
+        {/* Header gradient */}
+        <LinearGradient colors={['#4C1D95', '#7C3AED']} style={styles.itHeader}>
+          <Pressable onPress={() => router.back()} style={styles.itBackBtn}>
+            <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+          </Pressable>
+          <View style={styles.itHeaderCenter}>
+            <View style={styles.itIconBox}>
+              <Ionicons name="desktop-outline" size={36} color="#FFFFFF" />
+            </View>
+            <Text style={styles.itCompanyName}>{owned.customName || template.name}</Text>
+          </View>
+          <Pressable onPress={() => setRenameOpen(true)} style={styles.itBackBtn}>
+            <Ionicons name="settings-outline" size={20} color="#FFFFFF" />
+          </Pressable>
+        </LinearGradient>
+
+        {/* Summary card */}
+        <View style={styles.itSummaryCard}>
+          <View style={styles.itSummaryCol}>
+            <Text style={styles.itSummaryValue}>{formatMoney(pendingEarnings)}</Text>
+            <Text style={styles.itSummaryLabel}>Pending</Text>
+          </View>
+          <View style={styles.itSummaryDivider} />
+          <View style={styles.itSummaryCol}>
+            <Text style={styles.itSummaryValue}>{formatMoney(totalWage)}</Text>
+            <Text style={styles.itSummaryLabel}>Wage costs per hour</Text>
+          </View>
+        </View>
+
+        <View style={styles.itBody}>
+          {/* Projects */}
+          <Text style={styles.itSectionTitle}>Projects</Text>
+          <View style={styles.itProjectRow}>
+            <View style={styles.itProjectCard}>
+              <View style={styles.itProjectIcon}>
+                <Ionicons name="time-outline" size={24} color="#7C3AED" />
+              </View>
+              <Text style={styles.itProjectCount}>{activeProjects}</Text>
+              <Text style={styles.itProjectValue}>{formatMoney(incomePerHour)}</Text>
+              <Text style={styles.itProjectLabel}>In progress</Text>
+            </View>
+            <View style={styles.itProjectCard}>
+              <View style={[styles.itProjectIcon, { backgroundColor: '#DCFCE7' }]}>
+                <Ionicons name="checkmark-circle-outline" size={24} color={palette.success} />
+              </View>
+              <Text style={styles.itProjectCount}>{completedProjects}</Text>
+              <Text style={styles.itProjectValue}>{formatMoney(owned.totalEarned)}</Text>
+              <Text style={styles.itProjectLabel}>Complete</Text>
+            </View>
+          </View>
+
+          {level > 0 && projects.length > 0 && (
+            <View style={styles.itProjectList}>
+              <Text style={styles.itSubtitle}>Active projects</Text>
+              {projects.slice(0, 3).map((p, i) => (
+                <View key={i} style={styles.itProjectListRow}>
+                  <View style={styles.itProjectDot} />
+                  <Text style={styles.itProjectName}>{p.name}</Text>
+                  <Text style={styles.itProjectPay}>{formatMoney(p.value)}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {!owned.hasManager && level > 0 && (
+            <Pressable style={styles.itStartBtn} onPress={() => collect(id, Date.now())}>
+              <Text style={styles.itStartBtnText}>Collect earnings</Text>
+            </Pressable>
+          )}
+
+          {/* Employees */}
+          <Text style={styles.itSectionTitle}>Employees</Text>
+          <View style={styles.itEmployeeList}>
+            {IT_EMPLOYEES.map((emp) => {
+              const count = empCounts[emp.type] ?? 0;
+              const isNextType = emp === nextEmpType || (level >= emp.levelStart && level <= emp.levelEnd);
+              return (
+                <View key={emp.type} style={styles.itEmployeeRow}>
+                  <View style={[styles.itEmpIcon, { backgroundColor: emp.color + '22' }]}>
+                    <Ionicons name={emp.icon} size={22} color={emp.color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.itEmpLabel}>{emp.label}</Text>
+                    <Text style={styles.itEmpWage}>${emp.wagePerHr} / hour</Text>
+                  </View>
+                  <View style={styles.itEmpCountRow}>
+                    <View style={styles.itEmpCountBox}>
+                      <Text style={[styles.itEmpCount, count > 0 && { color: emp.color }]}>{count}</Text>
+                    </View>
+                    {isNextType && (
+                      <Pressable
+                        style={[styles.itHireBtn, !canHire && styles.itHireBtnDisabled]}
+                        onPress={() => {
+                          const ok = upgrade(id, 1);
+                          if (!ok) Alert.alert("Can't hire", `Need ${formatMoney(hireCost)}.`);
+                        }}
+                      >
+                        <Ionicons name="add" size={18} color={canHire ? '#FFFFFF' : palette.textTertiary} />
+                      </Pressable>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+
+          {/* Hire all options */}
+          <View style={styles.itHireRow}>
+            {([1, 10] as const).map((qty) => {
+              const q = Math.min(qty, template.maxLevel - level);
+              const cost = q > 0 ? upgradeCost(template, level, q) : new Decimal(0);
+              const can = q > 0 && balance.gte(cost);
+              return (
+                <Pressable
+                  key={qty}
+                  disabled={!can}
+                  onPress={() => upgrade(id, qty)}
+                  style={[styles.itHireOption, can ? styles.itHireOptionActive : styles.itHireOptionDisabled]}
+                >
+                  <Text style={[styles.itHireOptionLabel, can ? styles.itHireOptionLabelActive : styles.itHireOptionLabelDisabled]}>
+                    Hire ×{qty}
+                  </Text>
+                  <Text style={[styles.itHireOptionCost, can ? styles.itHireOptionCostActive : styles.itHireOptionCostDisabled]}>
+                    {cost.gt(0) ? formatMoney(cost) : '—'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Manager */}
+          <Text style={styles.itSectionTitle}>Office</Text>
+          <View style={styles.itOfficeCard}>
+            <View style={styles.itOfficeRow}>
+              <View style={styles.itOfficeIcon}>
+                <Ionicons name="people-outline" size={22} color="#7C3AED" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.itOfficeLabel}>Staff members</Text>
+                <View style={styles.itOfficeBarTrack}>
+                  <View style={[styles.itOfficeBarFill, { width: `${Math.min((totalStaff / officeCapacity) * 100, 100)}%` }]} />
+                </View>
+              </View>
+              <Text style={styles.itOfficeCount}>{totalStaff}/{officeCapacity}</Text>
+            </View>
+          </View>
+
+          {!owned.hasManager ? (
+            <Pressable
+              style={[styles.itManagerBtn, balance.lt(template.managerCost) && styles.itManagerBtnDisabled]}
+              onPress={() => {
+                const ok = hire(id);
+                if (!ok) Alert.alert("Can't hire", `Manager costs ${formatMoney(template.managerCost)}.`);
+              }}
+            >
+              <Ionicons name="person-add-outline" size={18} color={balance.gte(template.managerCost) ? '#FFFFFF' : palette.textTertiary} />
+              <View>
+                <Text style={[styles.itManagerBtnText, balance.lt(template.managerCost) && styles.itManagerBtnTextDisabled]}>
+                  Hire HR Manager (auto-collect)
+                </Text>
+                <Text style={[styles.itManagerBtnCost, balance.lt(template.managerCost) && styles.itManagerBtnTextDisabled]}>
+                  {formatMoney(template.managerCost)}
+                </Text>
+              </View>
+            </Pressable>
+          ) : (
+            <View style={styles.itManagerActive}>
+              <Ionicons name="checkmark-circle" size={20} color={palette.success} />
+              <Text style={styles.itManagerActiveText}>HR Manager hired — auto-collecting</Text>
+            </View>
+          )}
+        </View>
+      </ScrollView>
+
+      <NameBusinessSheet
+        visible={renameOpen}
+        template={template}
+        mode="rename"
+        initialName={owned.customName ?? ''}
+        onCancel={() => setRenameOpen(false)}
+        onConfirm={(name) => { rename(id, name); setRenameOpen(false); }}
+      />
+    </SafeAreaView>
+  );
+}
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
+
 function maxQty(template: ReturnType<typeof businessTemplate>, currentLevel: number, balance: Decimal): number {
   const r = new Decimal('1.07');
   const base = new Decimal(template.baseCost);
@@ -210,6 +453,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: palette.bg },
+
+  // ── Standard business ──────────────────────────────────────────────────────
   content: { padding: spacing.lg, gap: spacing.lg },
   headerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: palette.surface, ...shadow.card },
@@ -244,4 +489,66 @@ const styles = StyleSheet.create({
   statRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: palette.surfaceAlt },
   statLabel: { ...typography.body, color: palette.textSecondary },
   statValue: { ...typography.bodyMedium, color: palette.textPrimary },
+
+  // ── IT Company ─────────────────────────────────────────────────────────────
+  itHeader: { paddingTop: 56, paddingBottom: 32, paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  itBackBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  itHeaderCenter: { flex: 1, alignItems: 'center', gap: spacing.sm },
+  itIconBox: { width: 60, height: 60, borderRadius: radius.lg, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  itCompanyName: { ...typography.title, color: '#FFFFFF', fontWeight: '700' },
+  itSummaryCard: { marginHorizontal: spacing.lg, marginTop: -20, backgroundColor: palette.surface, borderRadius: radius.xl, padding: spacing.lg, flexDirection: 'row', ...shadow.card, zIndex: 10 },
+  itSummaryCol: { flex: 1, alignItems: 'center', gap: 4 },
+  itSummaryDivider: { width: 1, backgroundColor: palette.surfaceAlt },
+  itSummaryValue: { ...typography.headline, color: palette.textPrimary },
+  itSummaryLabel: { ...typography.caption, color: palette.textSecondary },
+  itBody: { padding: spacing.lg, gap: spacing.lg },
+  itSectionTitle: { ...typography.headline, color: palette.textPrimary },
+  itSubtitle: { ...typography.caption, color: palette.textSecondary, marginBottom: spacing.sm },
+  itProjectRow: { flexDirection: 'row', gap: spacing.md },
+  itProjectCard: { flex: 1, backgroundColor: palette.surface, borderRadius: radius.lg, padding: spacing.md, alignItems: 'flex-start', gap: 2, ...shadow.card },
+  itProjectIcon: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  itProjectCount: { ...typography.hero, color: palette.textPrimary },
+  itProjectValue: { ...typography.caption, color: palette.textSecondary },
+  itProjectLabel: { ...typography.micro, color: palette.textTertiary, marginTop: 4 },
+  itProjectList: { backgroundColor: palette.surface, borderRadius: radius.lg, padding: spacing.md, ...shadow.card, gap: spacing.sm },
+  itProjectListRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  itProjectDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#7C3AED' },
+  itProjectName: { flex: 1, ...typography.bodyMedium, color: palette.textPrimary },
+  itProjectPay: { ...typography.bodyMedium, color: palette.success, fontWeight: '700' },
+  itStartBtn: { backgroundColor: '#7C3AED', borderRadius: radius.pill, padding: spacing.md, alignItems: 'center' },
+  itStartBtnText: { ...typography.bodyMedium, color: '#FFFFFF', fontWeight: '700' },
+  itEmployeeList: { backgroundColor: palette.surface, borderRadius: radius.xl, overflow: 'hidden', ...shadow.card },
+  itEmployeeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderBottomWidth: 1, borderBottomColor: palette.surfaceAlt },
+  itEmpIcon: { width: 44, height: 44, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center' },
+  itEmpLabel: { ...typography.bodyMedium, color: palette.textPrimary, fontWeight: '600' },
+  itEmpWage: { ...typography.caption, color: palette.textSecondary, marginTop: 2 },
+  itEmpCountRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  itEmpCountBox: { width: 36, alignItems: 'center' },
+  itEmpCount: { ...typography.headline, color: palette.textTertiary, fontWeight: '700' },
+  itHireBtn: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#7C3AED', alignItems: 'center', justifyContent: 'center' },
+  itHireBtnDisabled: { backgroundColor: palette.surfaceAlt },
+  itHireRow: { flexDirection: 'row', gap: spacing.md },
+  itHireOption: { flex: 1, borderRadius: radius.lg, padding: spacing.md, alignItems: 'center', gap: 2 },
+  itHireOptionActive: { backgroundColor: '#EDE9FE' },
+  itHireOptionDisabled: { backgroundColor: palette.surfaceAlt },
+  itHireOptionLabel: { ...typography.bodyMedium, fontWeight: '700' },
+  itHireOptionLabelActive: { color: '#7C3AED' },
+  itHireOptionLabelDisabled: { color: palette.textTertiary },
+  itHireOptionCost: { ...typography.caption },
+  itHireOptionCostActive: { color: '#7C3AED' },
+  itHireOptionCostDisabled: { color: palette.textTertiary },
+  itOfficeCard: { backgroundColor: palette.surface, borderRadius: radius.lg, padding: spacing.md, ...shadow.card },
+  itOfficeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  itOfficeIcon: { width: 44, height: 44, borderRadius: radius.md, backgroundColor: '#EDE9FE', alignItems: 'center', justifyContent: 'center' },
+  itOfficeLabel: { ...typography.bodyMedium, color: palette.textPrimary, marginBottom: 6 },
+  itOfficeBarTrack: { height: 6, borderRadius: 3, backgroundColor: palette.surfaceAlt, overflow: 'hidden' },
+  itOfficeBarFill: { height: '100%', backgroundColor: '#7C3AED', borderRadius: 3 },
+  itOfficeCount: { ...typography.title, color: palette.textPrimary, fontWeight: '700' },
+  itManagerBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: '#7C3AED', borderRadius: radius.lg, padding: spacing.md },
+  itManagerBtnDisabled: { backgroundColor: palette.surfaceAlt },
+  itManagerBtnText: { ...typography.bodyMedium, color: '#FFFFFF', fontWeight: '700' },
+  itManagerBtnTextDisabled: { color: palette.textTertiary },
+  itManagerBtnCost: { ...typography.caption, color: 'rgba(255,255,255,0.7)' },
+  itManagerActive: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, backgroundColor: palette.successSoft, borderRadius: radius.lg, padding: spacing.md },
+  itManagerActiveText: { ...typography.bodyMedium, color: palette.success },
 });

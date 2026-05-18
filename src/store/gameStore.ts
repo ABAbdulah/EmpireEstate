@@ -1,13 +1,16 @@
 import { create } from 'zustand';
 import { produce } from 'immer';
 import Decimal from 'decimal.js';
-import { GameState, INITIAL_STATE, ActiveBoost, CarBusiness, CarInventoryItem } from './types';
+import { GameState, INITIAL_STATE, ActiveBoost, CarBusiness, CarInventoryItem, OwnedProperty } from './types';
 import { loadState, saveState } from './storage';
 import { M, Money, ZERO } from '../lib/money';
 import { businessTemplate, computePlayerLevel, levelIncomePerCycle, levelIncomePerHour, pendingCycles, pendingReward, tapBaseReward, upgradeCost } from '../game/economy';
-import { BUSINESSES } from '../content/businesses';
+import { BUSINESSES, MERGER_RECIPES } from '../content/businesses';
 import { STOCKS, CRYPTOS } from '../content/stocks';
 import { SHOWROOM_SIZES, SERVICE_SIZES, SPECIALIZATIONS, generateUsedCarOffer, CAR_CATALOG } from '../content/carBusiness';
+import { PROPERTIES, PROPERTY_UPGRADES, propertyRentPerHour } from '../content/realEstate';
+import { ITEMS, COLLECTIONS, computeCollectionMultipliers } from '../content/items';
+import { SkillKey } from '../content/carBusiness';
 
 interface StoreState {
   state: GameState;
@@ -34,8 +37,16 @@ interface StoreState {
 
   buyItem: (templateId: string, price: string) => boolean;
 
+  buyProperty: (templateId: string) => boolean;
+  sellProperty: (uid: string) => boolean;
+  upgradeProperty: (uid: string, upgradeId: string) => boolean;
+
   addBoost: (boost: ActiveBoost) => void;
   payTaxes: () => boolean;
+  prestige: () => boolean;
+  updateSettings: (key: keyof GameState['settings'], value: boolean) => void;
+  upgradeCarSkill: (uid: string, skill: SkillKey) => boolean;
+  completeMerger: (id: string) => boolean;
 
   createCarBusiness: (params: {
     name: string;
@@ -63,8 +74,19 @@ function activeMultiplier(boosts: ActiveBoost[], id: ActiveBoost['id'], nowMs: n
   return active.reduce((m, b) => m * b.multiplier, 1);
 }
 
+export function computeMergerMultiplier(completedMergers: string[]): number {
+  let mult = 1;
+  for (const recipe of MERGER_RECIPES) {
+    if (completedMergers.includes(recipe.id)) {
+      mult *= (1 + recipe.incomeBonus);
+    }
+  }
+  return mult;
+}
+
 export function aggregateIncomePerHour(state: GameState): Money {
   const level = computePlayerLevel(M(state.balance));
+  const colMult = computeCollectionMultipliers(state.collections);
   let total = ZERO;
   for (const [id, owned] of Object.entries(state.businesses)) {
     if (owned.level <= 0) continue;
@@ -78,6 +100,8 @@ export function aggregateIncomePerHour(state: GameState): Money {
   }
   total = total.times(level.globalIncomeMultiplier);
   total = total.times(new Decimal(1).plus(new Decimal(state.prestigeStars).times('0.02')));
+  total = total.times(colMult.globalIncomeMult);
+  total = total.times(computeMergerMultiplier(state.completedMergers));
   return total;
 }
 
@@ -107,6 +131,8 @@ export const useGame = create<StoreState>((set, get) => ({
     const businessMult = activeMultiplier(before.boosts, 'business_30', nowMs) * activeMultiplier(before.boosts, 'business_100', nowMs);
     const playerLevel = computePlayerLevel(M(before.balance));
     const prestigeMult = new Decimal(1).plus(new Decimal(before.prestigeStars).times('0.02'));
+    const colMult = computeCollectionMultipliers(before.collections);
+    const mergerMult = computeMergerMultiplier(before.completedMergers);
 
     const newBusinesses: GameState['businesses'] = {};
     for (const [id, owned] of Object.entries(before.businesses)) {
@@ -123,7 +149,10 @@ export const useGame = create<StoreState>((set, get) => ({
             .times(cycles)
             .times(playerLevel.globalIncomeMultiplier)
             .times(prestigeMult)
-            .times(businessMult);
+            .times(businessMult)
+            .times(colMult.businessIncomeMult)
+            .times(colMult.globalIncomeMult)
+            .times(mergerMult);
           gained = gained.plus(reward);
           totalEarned = totalEarned.plus(reward);
           bySource[id] = (bySource[id] ? M(bySource[id]).plus(reward) : reward).toString();
@@ -136,6 +165,16 @@ export const useGame = create<StoreState>((set, get) => ({
         lastCollectedAt,
         totalEarned: totalEarned.toString(),
       };
+    }
+
+    // Rent income from properties (always auto-collected, proportional to elapsed)
+    for (const prop of before.properties) {
+      const tmpl = PROPERTIES.find((p) => p.id === prop.templateId);
+      if (!tmpl) continue;
+      const hourlyRent = propertyRentPerHour(tmpl, prop.upgrades);
+      const rentEarned = M(hourlyRent).times(cappedMs / 3_600_000);
+      gained = gained.plus(rentEarned);
+      bySource['real_estate'] = M(bySource['real_estate'] ?? '0').plus(rentEarned).toString();
     }
 
     const newBoosts = before.boosts.filter((b) => b.endsAt > nowMs);
@@ -161,7 +200,8 @@ export const useGame = create<StoreState>((set, get) => ({
     const playerLevel = computePlayerLevel(M(before.balance));
     const base = tapBaseReward(before.tapLevel, M(before.balance));
     const tapMult = activeMultiplier(before.boosts, 'tap_2x', Date.now());
-    const reward = base.times(playerLevel.globalIncomeMultiplier).times(tapMult);
+    const colMult = computeCollectionMultipliers(before.collections);
+    const reward = base.times(playerLevel.globalIncomeMultiplier).times(tapMult).times(colMult.tapEarningsMult).times(colMult.globalIncomeMult);
 
     const newXp = before.tapXp + 1;
     const xpForNext = before.tapLevel * 20;
@@ -260,11 +300,16 @@ export const useGame = create<StoreState>((set, get) => ({
     const playerLevel = computePlayerLevel(M(before.balance));
     const prestigeMult = new Decimal(1).plus(new Decimal(before.prestigeStars).times('0.02'));
     const businessMult = activeMultiplier(before.boosts, 'business_30', nowMs) * activeMultiplier(before.boosts, 'business_100', nowMs);
+    const colMult = computeCollectionMultipliers(before.collections);
+    const mergerMult = computeMergerMultiplier(before.completedMergers);
     const reward = levelIncomePerCycle(t, owned.level)
       .times(cycles)
       .times(playerLevel.globalIncomeMultiplier)
       .times(prestigeMult)
-      .times(businessMult);
+      .times(businessMult)
+      .times(colMult.businessIncomeMult)
+      .times(colMult.globalIncomeMult)
+      .times(mergerMult);
     const next = produce(before, (draft) => {
       draft.balance = M(draft.balance).plus(reward).toString();
       draft.totalEarned = M(draft.totalEarned).plus(reward).toString();
@@ -282,6 +327,8 @@ export const useGame = create<StoreState>((set, get) => ({
     const playerLevel = computePlayerLevel(M(before.balance));
     const prestigeMult = new Decimal(1).plus(new Decimal(before.prestigeStars).times('0.02'));
     const businessMult = activeMultiplier(before.boosts, 'business_30', nowMs) * activeMultiplier(before.boosts, 'business_100', nowMs);
+    const colMult = computeCollectionMultipliers(before.collections);
+    const mergerMult = computeMergerMultiplier(before.completedMergers);
     let total = ZERO;
     const updates: Record<string, { lastCollectedAt: number; addedEarned: Decimal }> = {};
     for (const [id, owned] of Object.entries(before.businesses)) {
@@ -293,7 +340,10 @@ export const useGame = create<StoreState>((set, get) => ({
         .times(cycles)
         .times(playerLevel.globalIncomeMultiplier)
         .times(prestigeMult)
-        .times(businessMult);
+        .times(businessMult)
+        .times(colMult.businessIncomeMult)
+        .times(colMult.globalIncomeMult)
+        .times(mergerMult);
       total = total.plus(reward);
       updates[id] = {
         lastCollectedAt: owned.lastCollectedAt + cycles * t.cycleSeconds * 1000,
@@ -402,6 +452,7 @@ export const useGame = create<StoreState>((set, get) => ({
     const before = get().state;
     const cost = M(price);
     if (M(before.balance).lt(cost)) return false;
+    const tmpl = ITEMS.find((i) => i.id === templateId);
     const next = produce(before, (draft) => {
       draft.balance = M(draft.balance).minus(cost).toString();
       draft.totalSpent = M(draft.totalSpent).plus(cost).toString();
@@ -412,6 +463,73 @@ export const useGame = create<StoreState>((set, get) => ({
         purchaseDate: Date.now(),
         currentValueMultiplier: 1,
       });
+      if (tmpl?.collectionId) {
+        const colId = tmpl.collectionId;
+        if (!draft.collections[colId]) draft.collections[colId] = [];
+        if (!draft.collections[colId].includes(templateId)) {
+          draft.collections[colId].push(templateId);
+        }
+      }
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return true;
+  },
+
+  buyProperty: (templateId) => {
+    const before = get().state;
+    const tmpl = PROPERTIES.find((p) => p.id === templateId);
+    if (!tmpl) return false;
+    if (M(before.balance).lt(tmpl.price)) return false;
+    const uid = `${templateId}-${Date.now()}`;
+    const next = produce(before, (draft) => {
+      draft.balance = M(draft.balance).minus(tmpl.price).toString();
+      draft.totalSpent = M(draft.totalSpent).plus(tmpl.price).toString();
+      draft.properties.push({ uid, templateId, purchasePrice: tmpl.price.toString(), purchasedAt: Date.now(), upgrades: [], totalEarned: '0' });
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return true;
+  },
+
+  sellProperty: (uid) => {
+    const before = get().state;
+    const prop = before.properties.find((p) => p.uid === uid);
+    if (!prop) return false;
+    const tmpl = PROPERTIES.find((p) => p.id === prop.templateId);
+    if (!tmpl) return false;
+    // Market value after upgrades, minus sales tax
+    let valueMultiplier = 1;
+    for (const upId of prop.upgrades) {
+      const u = PROPERTY_UPGRADES.find((u) => u.id === upId);
+      if (u) valueMultiplier += u.valueBoost;
+    }
+    const marketValue = M(prop.purchasePrice).times(valueMultiplier);
+    const proceeds = marketValue.times(1 - tmpl.salesTaxRate);
+    const next = produce(before, (draft) => {
+      draft.balance = M(draft.balance).plus(proceeds).toString();
+      draft.totalEarned = M(draft.totalEarned).plus(proceeds).toString();
+      draft.properties = draft.properties.filter((p) => p.uid !== uid);
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return true;
+  },
+
+  upgradeProperty: (uid, upgradeId) => {
+    const before = get().state;
+    const prop = before.properties.find((p) => p.uid === uid);
+    if (!prop || prop.upgrades.includes(upgradeId)) return false;
+    const tmpl = PROPERTIES.find((p) => p.id === prop.templateId);
+    const upgrade = PROPERTY_UPGRADES.find((u) => u.id === upgradeId);
+    if (!tmpl || !upgrade) return false;
+    const cost = M(prop.purchasePrice).times(upgrade.costFraction);
+    if (M(before.balance).lt(cost)) return false;
+    const next = produce(before, (draft) => {
+      draft.balance = M(draft.balance).minus(cost).toString();
+      draft.totalSpent = M(draft.totalSpent).plus(cost).toString();
+      const p = draft.properties.find((p) => p.uid === uid)!;
+      p.upgrades.push(upgradeId);
     });
     set({ state: next });
     scheduleSave(next);
@@ -437,6 +555,78 @@ export const useGame = create<StoreState>((set, get) => ({
       draft.totalSpent = M(draft.totalSpent).plus(due).toString();
       draft.taxAccrued = '0';
       draft.taxDueAt = Date.now() + 7 * 86_400_000;
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return true;
+  },
+
+  prestige: () => {
+    const before = get().state;
+    const networth = computeNetworth(before);
+    const threshold = M('1000000').times(new Decimal('5').pow(before.prestigeCount));
+    if (networth.lt(threshold)) return false;
+    const next = produce({ ...INITIAL_STATE } as typeof before, (draft) => {
+      draft.prestigeStars = before.prestigeStars + 1;
+      draft.prestigeCount = before.prestigeCount + 1;
+      draft.items = before.items;
+      draft.collections = before.collections;
+      draft.settings = before.settings;
+      draft.vip = before.vip;
+      draft.noAds = before.noAds;
+      draft.installedAt = before.installedAt;
+      draft.lastTickAt = Date.now();
+      draft.taxDueAt = Date.now() + 7 * 86_400_000;
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return true;
+  },
+
+  updateSettings: (key, value) => {
+    const before = get().state;
+    const next = produce(before, (draft) => {
+      draft.settings[key] = value;
+    });
+    set({ state: next });
+    scheduleSave(next);
+  },
+
+  upgradeCarSkill: (uid, skill) => {
+    const before = get().state;
+    const idx = before.carBusinesses.findIndex((b) => b.uid === uid);
+    if (idx < 0) return false;
+    const cb = before.carBusinesses[idx];
+    const currentLevel = cb.skills[skill];
+    if (currentLevel >= 10) return false;
+    const cost = M('50000').times(currentLevel * currentLevel);
+    if (M(before.balance).lt(cost)) return false;
+    const next = produce(before, (draft) => {
+      draft.balance = M(draft.balance).minus(cost).toString();
+      draft.totalSpent = M(draft.totalSpent).plus(cost).toString();
+      draft.carBusinesses[idx].skills[skill] = currentLevel + 1;
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return true;
+  },
+
+  completeMerger: (id) => {
+    const before = get().state;
+    if (before.completedMergers.includes(id)) return false;
+    const recipe = MERGER_RECIPES.find((r) => r.id === id);
+    if (!recipe) return false;
+    // Check all requirements
+    for (const req of recipe.requirements) {
+      const owned = before.businesses[req.businessId];
+      if (!owned || owned.level < req.minLevel) return false;
+    }
+    const cost = M(recipe.investmentCost);
+    if (M(before.balance).lt(cost)) return false;
+    const next = produce(before, (draft) => {
+      draft.balance = M(draft.balance).minus(cost).toString();
+      draft.totalSpent = M(draft.totalSpent).plus(cost).toString();
+      draft.completedMergers.push(id);
     });
     set({ state: next });
     scheduleSave(next);
@@ -618,10 +808,31 @@ export function computeNetworth(state: GameState): Money {
     total = total.plus(M(price).times(owned.quantity));
   }
 
+  for (const prop of state.properties) {
+    const tmpl = PROPERTIES.find((p) => p.id === prop.templateId);
+    if (!tmpl) continue;
+    let mult = 1;
+    for (const upId of prop.upgrades) {
+      const u = PROPERTY_UPGRADES.find((u) => u.id === upId);
+      if (u) mult += u.valueBoost;
+    }
+    total = total.plus(M(prop.purchasePrice).times(mult));
+  }
+
   for (const item of state.items) {
     total = total.plus(M(item.purchasePrice).times(item.currentValueMultiplier));
   }
 
+  return total;
+}
+
+export function aggregateRentPerHour(state: GameState): Money {
+  let total = ZERO;
+  for (const prop of state.properties) {
+    const tmpl = PROPERTIES.find((p) => p.id === prop.templateId);
+    if (!tmpl) continue;
+    total = total.plus(propertyRentPerHour(tmpl, prop.upgrades));
+  }
   return total;
 }
 

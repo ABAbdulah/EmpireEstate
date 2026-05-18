@@ -31,10 +31,15 @@ export default function ProfileScreen() {
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomPad + 24 }]} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.heading}>Profile</Text>
-          <Pressable style={styles.connectBtn}>
-            <Ionicons name="person-circle-outline" size={20} color={palette.textSecondary} />
-            <Text style={styles.connectText}>Connect</Text>
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+            <Pressable style={styles.connectBtn}>
+              <Ionicons name="person-circle-outline" size={20} color={palette.textSecondary} />
+              <Text style={styles.connectText}>Connect</Text>
+            </Pressable>
+            <Pressable style={styles.iconBtn} onPress={() => router.push('/settings' as any)}>
+              <Ionicons name="settings-outline" size={20} color={palette.textSecondary} />
+            </Pressable>
+          </View>
         </View>
 
         <NetworthCard
@@ -72,6 +77,21 @@ export default function ProfileScreen() {
             <AssetCard category="residence"  label="Residence"   value={by.residence} cta="Buy a home" onPress={() => router.push('/items')} />
           </View>
         </View>
+
+        <Pressable style={styles.prestigeCard} onPress={() => router.push('/prestige' as any)}>
+          <View style={styles.prestigeLeft}>
+            <Text style={styles.prestigeStars}>
+              {state.prestigeStars > 0 ? '★'.repeat(Math.min(state.prestigeStars, 8)) : '☆'}
+            </Text>
+            <View>
+              <Text style={styles.prestigeTitle}>Prestige</Text>
+              <Text style={styles.prestigeSubtitle}>
+                {state.prestigeStars > 0 ? `+${state.prestigeStars * 2}% all income` : 'Reset for permanent bonuses'}
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.6)" />
+        </Pressable>
 
         <Card style={styles.taxCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
@@ -136,6 +156,12 @@ const styles = StyleSheet.create({
   heading: { ...typography.hero, color: palette.textPrimary },
   connectBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: spacing.md, paddingVertical: 8, backgroundColor: palette.surfaceAlt, borderRadius: radius.pill },
   connectText: { ...typography.caption, color: palette.textSecondary },
+  iconBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surfaceAlt, borderRadius: 18 },
+  prestigeCard: { backgroundColor: '#1F2937', borderRadius: radius.lg, padding: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  prestigeLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  prestigeStars: { fontSize: 24, color: '#F59E0B' },
+  prestigeTitle: { ...typography.title, color: '#FFFFFF' },
+  prestigeSubtitle: { ...typography.caption, color: 'rgba(255,255,255,0.6)', marginTop: 2 },
   progressLine: { gap: 6 },
   progressLabel: { ...typography.caption, color: palette.textSecondary },
   progressTrack: { height: 6, borderRadius: 3, backgroundColor: palette.surfaceAlt, overflow: 'hidden' },
