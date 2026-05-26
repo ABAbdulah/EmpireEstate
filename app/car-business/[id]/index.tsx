@@ -8,6 +8,7 @@ import { useGame } from '../../../src/store/gameStore';
 import { palette, radius, shadow, spacing, typography } from '../../../src/theme';
 import { formatMoney, M } from '../../../src/lib/money';
 import { SPECIALIZATIONS, SERVICE_SIZES, CAR_CATALOG } from '../../../src/content/carBusiness';
+import { getCarImage } from '../../../src/content/carImages';
 import { BottomSheet } from '../../../src/components/BottomSheet';
 import { Button } from '../../../src/components/Button';
 
@@ -110,17 +111,29 @@ export default function CarBusinessDetail() {
               {cb.inventory.map((car) => {
                 const tmpl = CAR_CATALOG.find((c) => c.id === car.catalogId);
                 return (
-                  <View key={car.uid} style={styles.fleetItem}>
+                  <Pressable
+                    key={car.uid}
+                    style={styles.fleetItem}
+                    onPress={() => router.push(`/car-business/${cb.uid}/car/${car.uid}` as any)}
+                  >
                     <View style={styles.fleetBox}>
-                      {tmpl?.imageUrl ? (
-                        <Image source={{ uri: tmpl.imageUrl }} style={styles.fleetImage} resizeMode="cover" />
-                      ) : (
-                        <Text style={styles.fleetEmoji}>{tmpl?.emoji ?? '🚗'}</Text>
-                      )}
+                      {(() => {
+                        const local = tmpl ? getCarImage(tmpl.id) : null;
+                        return local ? (
+                          <Image source={local} style={styles.fleetImage} resizeMode="contain" />
+                        ) : (
+                          <Text style={styles.fleetEmoji}>{tmpl?.emoji ?? '🚗'}</Text>
+                        );
+                      })()}
+                      {car.forSale ? (
+                        <View style={styles.forSaleBadge}>
+                          <Text style={styles.forSaleBadgeText}>SALE</Text>
+                        </View>
+                      ) : null}
                     </View>
                     <Text style={styles.fleetName} numberOfLines={1}>{tmpl?.name ?? 'Vehicle'}</Text>
                     <Text style={styles.fleetPrice}>{formatMoney(Number(car.askPrice))}</Text>
-                  </View>
+                  </Pressable>
                 );
               })}
             </ScrollView>
@@ -294,11 +307,13 @@ const styles = StyleSheet.create({
   fleetScroll: { marginTop: spacing.md },
   fleetRow: { gap: spacing.sm, paddingBottom: spacing.xs },
   fleetItem: { alignItems: 'center', width: 80, gap: 4 },
-  fleetBox: { width: 60, height: 60, borderRadius: 12, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  fleetBox: { width: 60, height: 60, borderRadius: 12, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   fleetImage: { width: 60, height: 60 },
   fleetEmoji: { fontSize: 32 },
   fleetName: { ...typography.micro, color: 'rgba(255,255,255,0.8)', textAlign: 'center', width: 80 },
   fleetPrice: { ...typography.micro, color: '#10B981', fontWeight: '700' },
+  forSaleBadge: { position: 'absolute', top: 2, right: 2, paddingHorizontal: 4, paddingVertical: 1, backgroundColor: '#F59E0B', borderRadius: 4 },
+  forSaleBadgeText: { fontSize: 9, color: '#FFFFFF', fontWeight: '800' },
   fleetEmpty: { ...typography.micro, color: 'rgba(255,255,255,0.5)', textAlign: 'center', paddingVertical: spacing.sm },
   quickGrid: { flexDirection: 'row', gap: spacing.md, paddingHorizontal: spacing.lg, marginTop: spacing.lg },
   quickTile: { flex: 1, padding: spacing.lg, backgroundColor: palette.surfaceAlt, borderRadius: radius.lg, minHeight: 140, justifyContent: 'space-between' },

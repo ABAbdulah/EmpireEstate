@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Switch, Text, View, Pressable } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Switch, Text, View, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -11,6 +11,7 @@ export default function SettingsScreen() {
   const vip = useGame((s) => s.state.vip);
   const noAds = useGame((s) => s.state.noAds);
   const updateSettings = useGame((s) => s.updateSettings);
+  const reset = useGame((s) => s.reset);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -86,6 +87,39 @@ export default function SettingsScreen() {
               </Pressable>
             )}
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>DATA</Text>
+          <Pressable
+            style={[styles.settingRow, { borderColor: palette.danger, borderWidth: 1 }]}
+            onPress={() => {
+              Alert.alert(
+                'Reset game?',
+                'This will erase ALL progress and start a fresh game. This cannot be undone.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Reset',
+                    style: 'destructive',
+                    onPress: async () => {
+                      await reset();
+                      router.replace('/');
+                    },
+                  },
+                ]
+              );
+            }}
+          >
+            <View style={styles.settingLeft}>
+              <Ionicons name="refresh-outline" size={20} color={palette.danger} />
+              <View>
+                <Text style={[styles.settingLabel, { color: palette.danger }]}>Reset game data</Text>
+                <Text style={styles.settingDesc}>Erase all progress and start over</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={palette.danger} />
+          </Pressable>
         </View>
 
         <View style={styles.section}>

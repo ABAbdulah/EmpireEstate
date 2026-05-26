@@ -48,8 +48,11 @@ export default function BusinessScreen() {
   const incomePerHour = useMemo(() => aggregateIncomePerHour(state), [state]);
 
   const owned = BUSINESSES.filter((b) => (state.businesses[b.id]?.level ?? 0) > 0);
-  const available = BUSINESSES.filter((b) => (state.businesses[b.id]?.level ?? 0) === 0 && networth.gte(b.unlockNetworth));
-  const locked = BUSINESSES.filter((b) => networth.lt(b.unlockNetworth));
+  const affordableCount = useMemo(() => {
+    return BUSINESSES.filter(
+      (b) => (state.businesses[b.id]?.level ?? 0) === 0 && M(state.balance).gte(b.baseCost)
+    ).length;
+  }, [state.businesses, state.balance]);
 
   const totalPending = useMemo(() => {
     const now = Date.now();
@@ -102,7 +105,14 @@ export default function BusinessScreen() {
         </View>
 
         <View style={styles.actionRow}>
-          <Button label="Start a business" onPress={() => setStartOpen(true)} style={{ flex: 1 }} />
+          <View style={{ flex: 1 }}>
+            <Button label="Start a business" onPress={() => setStartOpen(true)} style={{ flex: 1 }} />
+            {affordableCount > 0 ? (
+              <View style={styles.startBadge}>
+                <Text style={styles.startBadgeText}>{affordableCount}</Text>
+              </View>
+            ) : null}
+          </View>
           <Button label="Business mergers" variant="secondary" onPress={() => router.push('/mergers' as any)} style={{ flex: 1 }} />
         </View>
 
@@ -156,32 +166,11 @@ export default function BusinessScreen() {
           </View>
         ) : null}
 
-        {available.length > 0 ? (
-          <View style={{ gap: spacing.md }}>
-            <Text style={styles.sectionTitle}>Available to start</Text>
-            {available.map((t) => (
-              <BusinessRow
-                key={t.id}
-                template={t}
-                balance={state.balance}
-                onPress={() => {
-                  if (M(state.balance).lt(t.baseCost)) {
-                    Alert.alert("Can't buy", `Need ${formatMoney(t.baseCost)} to open ${t.name}.`);
-                    return;
-                  }
-                  setNameOpen(t);
-                }}
-              />
-            ))}
-          </View>
-        ) : null}
-
-        {locked.length > 0 ? (
-          <View style={styles.lockedHint}>
-            <Ionicons name="lock-closed-outline" size={16} color={palette.textTertiary} />
-            <Text style={styles.lockedText}>
-              {locked.length} more business{locked.length === 1 ? '' : 'es'} unlock as your fortune grows
-            </Text>
+        {owned.length === 0 && state.carBusinesses.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="business-outline" size={48} color={palette.textTertiary} />
+            <Text style={styles.emptyTitle}>No businesses yet</Text>
+            <Text style={styles.emptySubtitle}>Tap "Start a business" to open your first venture</Text>
           </View>
         ) : null}
       </ScrollView>
@@ -238,4 +227,9 @@ const styles = StyleSheet.create({
   carInventory: { ...typography.caption, color: palette.success, marginTop: 4 },
   lockedHint: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: spacing.md, backgroundColor: palette.surfaceAlt, borderRadius: radius.md, justifyContent: 'center' },
   lockedText: { ...typography.caption, color: palette.textTertiary },
+  startBadge: { position: 'absolute', top: -6, right: -6, minWidth: 22, height: 22, paddingHorizontal: 6, borderRadius: 11, backgroundColor: palette.success, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: palette.bg },
+  startBadgeText: { ...typography.micro, color: '#FFFFFF', fontWeight: '800' },
+  emptyState: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl, backgroundColor: palette.surface, borderRadius: radius.lg, ...shadow.card },
+  emptyTitle: { ...typography.title, color: palette.textPrimary, marginTop: spacing.sm },
+  emptySubtitle: { ...typography.caption, color: palette.textSecondary },
 });

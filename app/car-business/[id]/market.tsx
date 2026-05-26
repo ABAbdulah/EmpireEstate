@@ -7,6 +7,7 @@ import { useGame } from '../../../src/store/gameStore';
 import { palette, radius, shadow, spacing, typography } from '../../../src/theme';
 import { formatMoney, M } from '../../../src/lib/money';
 import { CAR_CATALOG, generateUsedCarOffer } from '../../../src/content/carBusiness';
+import { getCarImage } from '../../../src/content/carImages';
 
 export default function UsedCarMarket() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -57,7 +58,7 @@ export default function UsedCarMarket() {
           const full = cb.inventory.length >= cb.showroomCapacity;
           return (
             <View key={`${offer.id}-${i}`} style={styles.carCard}>
-              <CarImage imageUrl={offer.imageUrl} emoji={offer.emoji} />
+              <CarImage carId={offer.id} emoji={offer.emoji} segment={offer.segment} />
               <View style={{ flex: 1, gap: 4 }}>
                 <Text style={styles.carName}>{offer.name}</Text>
                 <View>
@@ -72,7 +73,11 @@ export default function UsedCarMarket() {
                 disabled={!can || full}
                 onPress={() => {
                   const ok = buy(cb.uid, offer.id, offer.askPrice.toString(), offer.condition);
-                  if (!ok) Alert.alert("Can't add", full ? 'Showroom is full — expand or sell a car first.' : 'Insufficient balance.');
+                  if (!ok) {
+                    Alert.alert("Can't add", full ? 'Showroom is full — expand or sell a car first.' : 'Insufficient balance.');
+                  } else {
+                    Alert.alert('Added to showroom', `${offer.name} for ${formatMoney(offer.askPrice)}. View it in the showroom to fix it up or list for sale.`);
+                  }
                 }}
                 style={[styles.addBtn, (!can || full) && styles.addBtnDisabled]}
               >
@@ -87,20 +92,23 @@ export default function UsedCarMarket() {
   );
 }
 
-function CarImage({ imageUrl, emoji }: { imageUrl: string; emoji: string }) {
-  const [imgFailed, setImgFailed] = useState(false);
+function CarImage({ carId, emoji, segment }: { carId: string; emoji: string; segment: 'mass' | 'luxury' | 'premium' }) {
+  const local = getCarImage(carId);
+  if (local) {
+    return (
+      <View style={styles.carImageBox}>
+        <Image source={local} style={styles.carImage} resizeMode="contain" />
+      </View>
+    );
+  }
+  // No local PNG available — show a styled card with segment color theming
+  const bg =
+    segment === 'premium' ? '#FEF3C7' :
+    segment === 'luxury'  ? '#E0E7FF' :
+                            '#F1F5F9';
   return (
-    <View style={styles.carImageBox}>
-      {!imgFailed ? (
-        <Image
-          source={{ uri: imageUrl }}
-          style={styles.carImage}
-          resizeMode="cover"
-          onError={() => setImgFailed(true)}
-        />
-      ) : (
-        <Text style={styles.carEmoji}>{emoji}</Text>
-      )}
+    <View style={[styles.carImageBox, { backgroundColor: bg }]}>
+      <Text style={styles.carEmoji}>{emoji}</Text>
     </View>
   );
 }
@@ -136,8 +144,9 @@ const styles = StyleSheet.create({
   chipLabelActive: { color: '#FFFFFF' },
   list: { paddingHorizontal: spacing.lg, gap: spacing.md },
   carCard: { flexDirection: 'row', gap: spacing.md, padding: spacing.md, backgroundColor: palette.surface, borderRadius: radius.lg, alignItems: 'center', ...shadow.card },
-  carImageBox: { width: 90, height: 80, borderRadius: radius.md, backgroundColor: palette.surfaceAlt, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  carImage: { width: 90, height: 80 },
+  carImageBox: { width: 110, height: 80, borderRadius: radius.md, backgroundColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' },
+  carImage: { width: 110, height: 80 },
+  carImageLoading: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.surfaceAlt },
   carEmoji: { fontSize: 38 },
   carName: { ...typography.bodyMedium, color: palette.textPrimary, fontWeight: '600' },
   conditionLabel: { ...typography.micro, color: palette.textTertiary },

@@ -5,7 +5,8 @@ import { GameState, INITIAL_STATE, ActiveBoost, CarBusiness, CarInventoryItem, O
 import { loadState, saveState } from './storage';
 import { M, Money, ZERO } from '../lib/money';
 import { businessTemplate, computePlayerLevel, levelIncomePerCycle, levelIncomePerHour, pendingCycles, pendingReward, tapBaseReward, upgradeCost } from '../game/economy';
-import { BUSINESSES, MERGER_RECIPES } from '../content/businesses';
+import { BUSINESSES, MERGER_RECIPES, getItEmployeeCounts } from '../content/businesses';
+import { getProjectById, isProjectUnlocked } from '../content/projects';
 import { STOCKS, CRYPTOS } from '../content/stocks';
 import { SHOWROOM_SIZES, SERVICE_SIZES, SPECIALIZATIONS, generateUsedCarOffer, CAR_CATALOG } from '../content/carBusiness';
 import { PROPERTIES, PROPERTY_UPGRADES, propertyRentPerHour } from '../content/realEstate';
@@ -48,6 +49,9 @@ interface StoreState {
   upgradeCarSkill: (uid: string, skill: SkillKey) => boolean;
   completeMerger: (id: string) => boolean;
 
+  startProject: (businessId: string, projectId: string) => { ok: boolean; reason?: string };
+  collectProject: (businessId: string) => { ok: boolean; reward?: string };
+
   createCarBusiness: (params: {
     name: string;
     showroomType: 'used' | 'new';
@@ -59,6 +63,34 @@ interface StoreState {
   buyCarForInventory: (uid: string, catalogId: string, askPrice: string, condition: number) => boolean;
   sellCarFromInventory: (uid: string, carUid: string, salePrice: string) => boolean;
   collectCarBusiness: (uid: string, nowMs: number) => Money;
+
+  fixCarPart: (businessUid: string, carUid: string, part: 'engine' | 'transmission' | 'chassis' | 'body') => { ok: boolean; reason?: string };
+  listCarForSale: (businessUid: string, carUid: string) => { ok: boolean; reason?: string };
+  cancelCarListing: (businessUid: string, carUid: string) => boolean;
+}
+
+// Pricing helpers exported for UI use
+export function carFixCost(purchasePrice: string, part: string): Money {
+  // Each part fix costs 4-8% of purchase price
+  const base = M(purchasePrice).times('0.05');
+  return base;
+}
+
+export function carConditionAfterFix(currentCondition: number): number {
+  return Math.min(1, currentCondition + 0.15);
+}
+
+export function carMarketPrice(item: CarInventoryItem, catalogBasePrice: number, segment: string): Money {
+  // Market price = (basePrice * 0.6..1.3 random based on uid) * condition
+  // Plus 50% of fixes spent recovered
+  // Random factor seeded by uid so it stays stable
+  let hash = 0;
+  for (let i = 0; i < item.uid.length; i++) hash = (hash * 31 + item.uid.charCodeAt(i)) % 1000000;
+  const factor = 0.65 + ((hash % 1000) / 1000) * 0.6; // 0.65..1.25
+  const conditionMult = 0.4 + item.condition * 0.7; // condition 0..1 → 0.4..1.1
+  const marketBase = M(catalogBasePrice).times(factor).times(conditionMult);
+  const fixesValue = M(item.fixesSpent).times('0.5');
+  return marketBase.plus(fixesValue).ceil();
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -91,7 +123,9 @@ export function aggregateIncomePerHour(state: GameState): Money {
   for (const [id, owned] of Object.entries(state.businesses)) {
     if (owned.level <= 0) continue;
     const t = businessTemplate(id);
-    total = total.plus(levelIncomePerHour(t, owned.level));
+    const baseHourly = levelIncomePerHour(t, owned.level);
+    const mgrMult = owned.hasManager ? new Decimal('1.25') : new Decimal('1');
+    total = total.plus(baseHourly.times(mgrMult));
   }
   for (const cb of state.carBusinesses) {
     const spec = SPECIALIZATIONS.find((s) => s.id === cb.specialization);
@@ -152,7 +186,8 @@ export const useGame = create<StoreState>((set, get) => ({
             .times(businessMult)
             .times(colMult.businessIncomeMult)
             .times(colMult.globalIncomeMult)
-            .times(mergerMult);
+            .times(mergerMult)
+            .times('1.25');
           gained = gained.plus(reward);
           totalEarned = totalEarned.plus(reward);
           bySource[id] = (bySource[id] ? M(bySource[id]).plus(reward) : reward).toString();
@@ -179,20 +214,50 @@ export const useGame = create<StoreState>((set, get) => ({
 
     const newBoosts = before.boosts.filter((b) => b.endsAt > nowMs);
 
+    // Auto-sell cars whose for-sale duration has completed
+    let carSaleGain = ZERO;
+    const newCarBusinesses = before.carBusinesses.map((cb) => {
+      const remaining: CarInventoryItem[] = [];
+      let businessGain = ZERO;
+      for (const car of cb.inventory) {
+        if (car.forSale && car.forSaleCompletesAt && nowMs >= car.forSaleCompletesAt) {
+          const tmpl = CAR_CATALOG.find((c) => c.id === car.catalogId);
+          if (tmpl) {
+            const price = carMarketPrice(car, tmpl.basePrice, tmpl.segment);
+            businessGain = businessGain.plus(price);
+            carSaleGain = carSaleGain.plus(price);
+            continue; // sold — drop from inventory
+          }
+        }
+        remaining.push(car);
+      }
+      return {
+        ...cb,
+        inventory: remaining,
+        totalEarned: M(cb.totalEarned).plus(businessGain).toString(),
+      };
+    });
+
+    const totalGained = gained.plus(carSaleGain);
+    if (carSaleGain.gt(0)) {
+      bySource['car_sales'] = carSaleGain.toString();
+    }
+
     const newState: GameState = {
       ...before,
       businesses: newBusinesses,
-      balance: M(before.balance).plus(gained).toString(),
-      totalEarned: M(before.totalEarned).plus(gained).toString(),
+      carBusinesses: newCarBusinesses,
+      balance: M(before.balance).plus(totalGained).toString(),
+      totalEarned: M(before.totalEarned).plus(totalGained).toString(),
       lastTickAt: nowMs,
       boosts: newBoosts,
-      taxAccrued: M(before.taxAccrued).plus(gained.times('0.12')).toString(),
+      taxAccrued: M(before.taxAccrued).plus(totalGained.times('0.12')).toString(),
     };
 
     set({ state: newState });
     scheduleSave(newState);
 
-    return { gained, bySource };
+    return { gained: totalGained, bySource };
   },
 
   doTap: () => {
@@ -633,6 +698,70 @@ export const useGame = create<StoreState>((set, get) => ({
     return true;
   },
 
+  startProject: (businessId, projectId) => {
+    const before = get().state;
+    const project = getProjectById(projectId);
+    if (!project || project.businessId !== businessId) return { ok: false, reason: 'Unknown project' };
+    // One active project per business at a time
+    const alreadyRunning = before.activeProjects.find((p) => p.businessId === businessId);
+    if (alreadyRunning) return { ok: false, reason: 'A project is already running for this business' };
+    // Unlock check
+    if (!isProjectUnlocked(project, before.projectsCompleted)) {
+      return { ok: false, reason: 'Project locked — complete previous tier first' };
+    }
+    // Cost check
+    if (M(before.balance).lt(project.cost)) {
+      return { ok: false, reason: 'Insufficient funds' };
+    }
+    // IT staff check (level controls available staff)
+    if (project.staffRequired) {
+      const owned = before.businesses[businessId];
+      const level = owned?.level ?? 0;
+      const counts = getItEmployeeCounts(level);
+      for (const [role, need] of Object.entries(project.staffRequired)) {
+        if ((counts[role] ?? 0) < need) {
+          return { ok: false, reason: `Need ${need} ${role.replace('_', ' ')}(s) — upgrade business level` };
+        }
+      }
+    }
+    const now = Date.now();
+    const next = produce(before, (draft) => {
+      draft.balance = M(draft.balance).minus(project.cost).toString();
+      draft.totalSpent = M(draft.totalSpent).plus(project.cost).toString();
+      draft.activeProjects.push({
+        businessId,
+        projectId,
+        startedAt: now,
+        completesAt: now + project.durationSeconds * 1000,
+      });
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return { ok: true };
+  },
+
+  collectProject: (businessId) => {
+    const before = get().state;
+    const active = before.activeProjects.find((p) => p.businessId === businessId);
+    if (!active) return { ok: false };
+    if (Date.now() < active.completesAt) return { ok: false };
+    const project = getProjectById(active.projectId);
+    if (!project) return { ok: false };
+    const reward = M(project.reward);
+    const next = produce(before, (draft) => {
+      draft.balance = M(draft.balance).plus(reward).toString();
+      draft.totalEarned = M(draft.totalEarned).plus(reward).toString();
+      draft.activeProjects = draft.activeProjects.filter(
+        (p) => !(p.businessId === businessId && p.projectId === active.projectId && p.startedAt === active.startedAt)
+      );
+      draft.projectsCompleted[active.projectId] = (draft.projectsCompleted[active.projectId] ?? 0) + 1;
+      draft.taxAccrued = M(draft.taxAccrued).plus(reward.times('0.12')).toString();
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return { ok: true, reward: reward.toString() };
+  },
+
   createCarBusiness: ({ name, showroomType, showroomSize, specialization }) => {
     const before = get().state;
     const size = SHOWROOM_SIZES.find((s) => s.id === showroomSize);
@@ -710,6 +839,8 @@ export const useGame = create<StoreState>((set, get) => ({
       askPrice,
       condition,
       acquiredAt: Date.now(),
+      fixesSpent: '0',
+      forSale: false,
     };
     const next = produce(before, (draft) => {
       draft.balance = M(draft.balance).minus(cost).toString();
@@ -762,6 +893,65 @@ export const useGame = create<StoreState>((set, get) => ({
     set({ state: next });
     scheduleSave(next);
     return gained;
+  },
+
+  fixCarPart: (businessUid, carUid, _part) => {
+    const before = get().state;
+    const bizIdx = before.carBusinesses.findIndex((b) => b.uid === businessUid);
+    if (bizIdx < 0) return { ok: false, reason: 'Business not found' };
+    const car = before.carBusinesses[bizIdx].inventory.find((c) => c.uid === carUid);
+    if (!car) return { ok: false, reason: 'Car not found' };
+    if (car.forSale) return { ok: false, reason: 'Cannot fix a car that is listed for sale' };
+    if (car.condition >= 1) return { ok: false, reason: 'This part is already in perfect condition' };
+    const cost = carFixCost(car.purchasePrice, _part);
+    if (M(before.balance).lt(cost)) return { ok: false, reason: 'Insufficient funds' };
+    const next = produce(before, (draft) => {
+      draft.balance = M(draft.balance).minus(cost).toString();
+      draft.totalSpent = M(draft.totalSpent).plus(cost).toString();
+      const c = draft.carBusinesses[bizIdx].inventory.find((x) => x.uid === carUid)!;
+      c.fixesSpent = M(c.fixesSpent).plus(cost).toString();
+      c.condition = carConditionAfterFix(c.condition);
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return { ok: true };
+  },
+
+  listCarForSale: (businessUid, carUid) => {
+    const before = get().state;
+    const bizIdx = before.carBusinesses.findIndex((b) => b.uid === businessUid);
+    if (bizIdx < 0) return { ok: false, reason: 'Business not found' };
+    const car = before.carBusinesses[bizIdx].inventory.find((c) => c.uid === carUid);
+    if (!car) return { ok: false, reason: 'Car not found' };
+    if (car.forSale) return { ok: false, reason: 'Already listed for sale' };
+    const now = Date.now();
+    const durationMs = (30 + Math.floor(Math.random() * 16)) * 60 * 1000; // 30-45 min
+    const next = produce(before, (draft) => {
+      const c = draft.carBusinesses[bizIdx].inventory.find((x) => x.uid === carUid)!;
+      c.forSale = true;
+      c.forSaleListedAt = now;
+      c.forSaleCompletesAt = now + durationMs;
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return { ok: true };
+  },
+
+  cancelCarListing: (businessUid, carUid) => {
+    const before = get().state;
+    const bizIdx = before.carBusinesses.findIndex((b) => b.uid === businessUid);
+    if (bizIdx < 0) return false;
+    const car = before.carBusinesses[bizIdx].inventory.find((c) => c.uid === carUid);
+    if (!car || !car.forSale) return false;
+    const next = produce(before, (draft) => {
+      const c = draft.carBusinesses[bizIdx].inventory.find((x) => x.uid === carUid)!;
+      c.forSale = false;
+      c.forSaleListedAt = undefined;
+      c.forSaleCompletesAt = undefined;
+    });
+    set({ state: next });
+    scheduleSave(next);
+    return true;
   },
 }));
 

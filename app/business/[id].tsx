@@ -14,6 +14,8 @@ import { Button } from '../../src/components/Button';
 import { Card } from '../../src/components/Card';
 import { Sparkline } from '../../src/components/Sparkline';
 import { NameBusinessSheet } from '../../src/components/NameBusinessSheet';
+import { ProjectPanel } from '../../src/components/ProjectPanel';
+import { getProjectsForBusiness } from '../../src/content/projects';
 
 const QTY_OPTIONS: Array<{ label: string; qty: number | 'max' }> = [
   { label: '×1', qty: 1 },
@@ -183,6 +185,12 @@ export default function BusinessDetail() {
           </View>
         </Card>
 
+        {getProjectsForBusiness(template.id).length > 0 ? (
+          <Card style={{ paddingHorizontal: 0, paddingVertical: 0 }}>
+            <ProjectPanel businessId={template.id} />
+          </Card>
+        ) : null}
+
         <Card>
           <Text style={styles.sectionTitle}>Stats</Text>
           <Stat label="Per cycle" value={`${formatMoney(cycleReward)} / ${template.cycleSeconds}s`} />
@@ -294,16 +302,9 @@ function ItCompanyDetail({
             </View>
           </View>
 
-          {level > 0 && projects.length > 0 && (
-            <View style={styles.itProjectList}>
-              <Text style={styles.itSubtitle}>Active projects</Text>
-              {projects.slice(0, 3).map((p, i) => (
-                <View key={i} style={styles.itProjectListRow}>
-                  <View style={styles.itProjectDot} />
-                  <Text style={styles.itProjectName}>{p.name}</Text>
-                  <Text style={styles.itProjectPay}>{formatMoney(p.value)}</Text>
-                </View>
-              ))}
+          {level > 0 && (
+            <View style={{ marginHorizontal: -spacing.lg }}>
+              <ProjectPanel businessId={id} />
             </View>
           )}
 

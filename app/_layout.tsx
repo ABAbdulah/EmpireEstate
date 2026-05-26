@@ -35,6 +35,7 @@ export default function RootLayout() {
           <Stack.Screen name="car-business/[id]/index" options={{ presentation: 'card', animation: 'slide_from_right' }} />
           <Stack.Screen name="car-business/[id]/market" options={{ presentation: 'card', animation: 'slide_from_right' }} />
           <Stack.Screen name="car-business/[id]/skills" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+          <Stack.Screen name="car-business/[id]/car/[uid]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
           <Stack.Screen name="investing/portfolio" options={{ presentation: 'card', animation: 'slide_from_right' }} />
           <Stack.Screen name="investing/stocks" options={{ presentation: 'card', animation: 'slide_from_right' }} />
           <Stack.Screen name="investing/stock/[ticker]" options={{ presentation: 'card', animation: 'slide_from_right' }} />

@@ -43,6 +43,10 @@ export interface CarInventoryItem {
   askPrice: string;
   condition: number;
   acquiredAt: number;
+  fixesSpent: string;              // total money spent fixing this car
+  forSale: boolean;                // true if listed for auto-sale
+  forSaleListedAt?: number;        // when it was listed
+  forSaleCompletesAt?: number;     // when it'll auto-sell
 }
 
 export interface CarBusiness {
@@ -60,6 +64,13 @@ export interface CarBusiness {
   lastCollectedAt: number;
   totalEarned: string;
   createdAt: number;
+}
+
+export interface ActiveProject {
+  businessId: string;
+  projectId: string;
+  startedAt: number;
+  completesAt: number;
 }
 
 export interface ActiveBoost {
@@ -98,6 +109,9 @@ export interface GameState {
 
   completedMergers: string[];
 
+  activeProjects: ActiveProject[];
+  projectsCompleted: Record<string, number>;
+
   settings: {
     sound: boolean;
     haptics: boolean;
@@ -109,7 +123,7 @@ export interface GameState {
 }
 
 export const INITIAL_STATE: GameState = {
-  balance: '50',
+  balance: '0',
   lastTickAt: 0,
   totalEarned: '0',
   totalSpent: '0',
@@ -137,6 +151,9 @@ export const INITIAL_STATE: GameState = {
   boosts: [],
 
   completedMergers: [],
+
+  activeProjects: [],
+  projectsCompleted: {},
 
   settings: {
     sound: false,

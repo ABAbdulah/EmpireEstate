@@ -15,10 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.empirestate.app"
+      "bundleIdentifier": "com.empirestategame.app"
     },
     "android": {
-      "package": "com.empirestate.app",
+      "package": "com.empirestategame.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#F7F8FA"

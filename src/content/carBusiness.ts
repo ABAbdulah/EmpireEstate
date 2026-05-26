@@ -45,48 +45,55 @@ export const SPECIALIZATIONS: SpecializationTemplate[] = [
   { id: 'premium', label: 'Premium vehicles & jets',  examples: 'Ferarry V60, Boieng 7S Private Jet, Ferarry Superyacht 88, etc.', avgPrice: '8313927', baseHourlyPerVehicle: '70000' },
 ];
 
+export type VehicleType = 'car' | 'boat' | 'plane' | 'yacht';
+
 export interface CarCatalogEntry {
   id: string;
   name: string;
   segment: Specialization;
+  vehicleType: VehicleType;
   basePrice: number;
   emoji: string;
   imageUrl: string;
 }
 
-const UX = 'https://images.unsplash.com/photo-';
-const Q  = '?w=500&q=80&fit=crop&auto=format';
+// Generates clean, accurate AI car images via Pollinations.ai.
+// No API key needed. Same prompt+seed → same image (cached on their CDN).
+function aiImage(prompt: string, seed: number): string {
+  const fullPrompt = `${prompt}, side profile view, white background, photorealistic product shot`;
+  return `https://image.pollinations.ai/prompt/${encodeURIComponent(fullPrompt)}?width=400&height=260&nologo=true&seed=${seed}`;
+}
 
 export const CAR_CATALOG: CarCatalogEntry[] = [
   // Mass — economy hatchbacks & sedans
-  { id: 'vw-golv',       name: 'Volkswagon Golv',          segment: 'mass',    basePrice:  21500, emoji: '🚙', imageUrl: `${UX}1549317661-be9034e1e56b${Q}` },
-  { id: 'renolt-logon',  name: 'Renolt Logon',             segment: 'mass',    basePrice:  18900, emoji: '🚗', imageUrl: `${UX}1502877338535-766e1452684a${Q}` },
-  { id: 'alfo-tonnle',   name: 'Alfo Romeus Tonnle',       segment: 'mass',    basePrice:  28400, emoji: '🚘', imageUrl: `${UX}1489824904134-891ab64532f1${Q}` },
-  { id: 'toyoda-corla',  name: 'Toyoda Corla',             segment: 'mass',    basePrice:  22300, emoji: '🚖', imageUrl: `${UX}1559416523-140ddc3d238c${Q}` },
-  { id: 'hondo-civica',  name: 'Hondo Civica',             segment: 'mass',    basePrice:  24800, emoji: '🚗', imageUrl: `${UX}1590362891991-f776e747a588${Q}` },
+  { id: 'vw-golv',       name: 'Volkswagon Golv',          segment: 'mass',    vehicleType: 'car',   basePrice:  21500,    emoji: '🚙', imageUrl: aiImage('compact silver hatchback car, modern european design', 101) },
+  { id: 'renolt-logon',  name: 'Renolt Logon',             segment: 'mass',    vehicleType: 'car',   basePrice:  18900,    emoji: '🚗', imageUrl: aiImage('budget white sedan car, simple economy car', 102) },
+  { id: 'alfo-tonnle',   name: 'Alfo Romeus Tonnle',       segment: 'mass',    vehicleType: 'car',   basePrice:  28400,    emoji: '🚘', imageUrl: aiImage('compact red italian crossover SUV', 103) },
+  { id: 'toyoda-corla',  name: 'Toyoda Corla',             segment: 'mass',    vehicleType: 'car',   basePrice:  22300,    emoji: '🚖', imageUrl: aiImage('silver japanese compact sedan, reliable family car', 104) },
+  { id: 'hondo-civica',  name: 'Hondo Civica',             segment: 'mass',    vehicleType: 'car',   basePrice:  24800,    emoji: '🚗', imageUrl: aiImage('blue compact japanese sedan, sporty hatchback', 105) },
   // Luxury — premium sedans & SUVs
-  { id: 'auddi-a6',      name: 'Auddi A6',                 segment: 'luxury',  basePrice: 168000, emoji: '🚘', imageUrl: `${UX}1537984822441-cff330075342${Q}` },
-  { id: 'tkm-xbov',      name: 'TKM X-BOV',                segment: 'luxury',  basePrice: 195000, emoji: '🏎️', imageUrl: `${UX}1533473359331-0135ef1b58bf${Q}` },
-  { id: 'alfo-julia',    name: 'Alfo Romeus Julia',        segment: 'luxury',  basePrice: 172500, emoji: '🚙', imageUrl: `${UX}1568605117036-5f7153ac2445${Q}` },
-  { id: 'dmw-m8',        name: 'DMW M8 Grand Coupe',       segment: 'luxury',  basePrice: 156000, emoji: '🚘', imageUrl: `${UX}1555215695-3004980ad54e${Q}` },
-  { id: 'lezus-450',     name: 'Lezus 450',                segment: 'luxury',  basePrice:  51700, emoji: '🚗', imageUrl: `${UX}1563720223809-b4b4a89e2a2b${Q}` },
-  { id: 'genetic-c90',   name: 'Genetic C90',              segment: 'luxury',  basePrice: 107900, emoji: '🚙', imageUrl: `${UX}1606664515524-ed2f786a705b${Q}` },
-  { id: 'mercedes-gls',  name: 'Marcedes-Meybach GLS',     segment: 'luxury',  basePrice: 130900, emoji: '🚙', imageUrl: `${UX}1552519507-da3b142c-c549${Q}` },
+  { id: 'auddi-a6',      name: 'Auddi A6',                 segment: 'luxury',  vehicleType: 'car',   basePrice: 168000,    emoji: '🚘', imageUrl: aiImage('silver german luxury executive sedan', 201) },
+  { id: 'tkm-xbov',      name: 'TKM X-BOV',                segment: 'luxury',  vehicleType: 'car',   basePrice: 195000,    emoji: '🏎️', imageUrl: aiImage('black luxury sports sedan, aggressive design', 202) },
+  { id: 'alfo-julia',    name: 'Alfo Romeus Julia',        segment: 'luxury',  vehicleType: 'car',   basePrice: 172500,    emoji: '🚙', imageUrl: aiImage('red italian luxury sport sedan', 203) },
+  { id: 'dmw-m8',        name: 'DMW M8 Grand Coupe',       segment: 'luxury',  vehicleType: 'car',   basePrice: 156000,    emoji: '🚘', imageUrl: aiImage('black german grand coupe luxury sports car', 204) },
+  { id: 'lezus-450',     name: 'Lezus 450',                segment: 'luxury',  vehicleType: 'car',   basePrice:  51700,    emoji: '🚗', imageUrl: aiImage('silver japanese luxury sedan, refined design', 205) },
+  { id: 'genetic-c90',   name: 'Genetic C90',              segment: 'luxury',  vehicleType: 'car',   basePrice: 107900,    emoji: '🚙', imageUrl: aiImage('white luxury sedan, korean premium car', 206) },
+  { id: 'mercedes-gls',  name: 'Marcedes-Meybach GLS',     segment: 'luxury',  vehicleType: 'car',   basePrice: 130900,    emoji: '🚙', imageUrl: aiImage('black german luxury full-size SUV', 207) },
   // Premium supercars
-  { id: 'ferarry-v60',   name: 'Ferarry V60',              segment: 'premium', basePrice: 6800000, emoji: '🏎️', imageUrl: `${UX}1580274455191-1c62238fa333${Q}` },
-  { id: 'mercedes-exo',  name: 'Marcedes-Maybech Exolero', segment: 'premium', basePrice: 9200000, emoji: '🏎️', imageUrl: `${UX}1526726538690-5cbf956ae2fd${Q}` },
-  { id: 'macleran-b1',   name: 'MacLeran B1',              segment: 'premium', basePrice: 7400000, emoji: '🏁', imageUrl: `${UX}1525609004556-c46c7d6cf023${Q}` },
+  { id: 'ferarry-v60',   name: 'Ferarry V60',              segment: 'premium', vehicleType: 'car',   basePrice: 6800000,   emoji: '🏎️', imageUrl: aiImage('red italian supercar, exotic sports car', 301) },
+  { id: 'mercedes-exo',  name: 'Marcedes-Maybech Exolero', segment: 'premium', vehicleType: 'car',   basePrice: 9200000,   emoji: '🏎️', imageUrl: aiImage('silver german hypercar, exotic supercar', 302) },
+  { id: 'macleran-b1',   name: 'MacLeran B1',              segment: 'premium', vehicleType: 'car',   basePrice: 7400000,   emoji: '🏁', imageUrl: aiImage('orange british supercar, mid-engine exotic', 303) },
   // Luxury boats & yachts
-  { id: 'ferarry-jet',   name: 'Ferarry Jet Tender 29',    segment: 'luxury',  basePrice:  320000, emoji: '🚤', imageUrl: `${UX}1570077188670-e3a8d69ac5ff${Q}` },
-  { id: 'lezus-marine',  name: 'Lezus Marine LX-500',      segment: 'luxury',  basePrice:  285000, emoji: '⛵', imageUrl: `${UX}1548540916-7e00e9f24bcf${Q}` },
-  { id: 'dmw-cruiser',   name: 'DMW Lake Cruiser C6',      segment: 'luxury',  basePrice:  178000, emoji: '🛥️', imageUrl: `${UX}1534438327276-14e5300c3a48${Q}` },
-  { id: 'hondo-mariner', name: 'Hondo Mariner 350',        segment: 'luxury',  basePrice:  215000, emoji: '🚤', imageUrl: `${UX}1545566810-8c2dd0dd0c1a${Q}` },
+  { id: 'ferarry-jet',   name: 'Ferarry Jet Tender 29',    segment: 'luxury',  vehicleType: 'boat',  basePrice:  320000,   emoji: '🚤', imageUrl: aiImage('luxury speedboat tender, red and white sport boat', 401) },
+  { id: 'lezus-marine',  name: 'Lezus Marine LX-500',      segment: 'luxury',  vehicleType: 'boat',  basePrice:  285000,   emoji: '⛵', imageUrl: aiImage('white luxury cabin cruiser boat', 402) },
+  { id: 'dmw-cruiser',   name: 'DMW Lake Cruiser C6',      segment: 'luxury',  vehicleType: 'boat',  basePrice:  178000,   emoji: '🛥️', imageUrl: aiImage('white motor yacht cruiser boat', 403) },
+  { id: 'hondo-mariner', name: 'Hondo Mariner 350',        segment: 'luxury',  vehicleType: 'boat',  basePrice:  215000,   emoji: '🚤', imageUrl: aiImage('white luxury speedboat, sporty marine craft', 404) },
   // Premium yachts & private jets
-  { id: 'boieng-7s',     name: 'Boieng 7S Private Jet',    segment: 'premium', basePrice: 12000000, emoji: '✈️', imageUrl: `${UX}1474487548417-781cb71495f3${Q}` },
-  { id: 'arrbus-exec',   name: 'Arrbus A320 Executive',    segment: 'premium', basePrice:  8500000, emoji: '✈️', imageUrl: `${UX}1436491865332-7a61a109cc05${Q}` },
-  { id: 'cessna-sky',    name: 'Cessna Skymatter 400',     segment: 'luxury',  basePrice:   340000, emoji: '🛩️', imageUrl: `${UX}1544636331-e26879cd4d9b${Q}` },
-  { id: 'ferarry-yacht', name: 'Ferarry Superyacht 88',    segment: 'premium', basePrice: 14200000, emoji: '🛳️', imageUrl: `${UX}1567899378494-47b22a2ae96a${Q}` },
-  { id: 'mbych-yacht',   name: 'Marcedes-Meybach Yacht X', segment: 'premium', basePrice:  5800000, emoji: '⛵', imageUrl: `${UX}1507525428034-b723cf961d3e${Q}` },
+  { id: 'boieng-7s',     name: 'Boieng 7S Private Jet',    segment: 'premium', vehicleType: 'plane', basePrice: 12000000,  emoji: '✈️', imageUrl: aiImage('white private business jet airplane', 501) },
+  { id: 'arrbus-exec',   name: 'Arrbus A320 Executive',    segment: 'premium', vehicleType: 'plane', basePrice:  8500000,  emoji: '✈️', imageUrl: aiImage('executive corporate jet airplane', 502) },
+  { id: 'cessna-sky',    name: 'Cessna Skymatter 400',     segment: 'luxury',  vehicleType: 'plane', basePrice:   340000,  emoji: '🛩️', imageUrl: aiImage('small white private propeller airplane', 503) },
+  { id: 'ferarry-yacht', name: 'Ferarry Superyacht 88',    segment: 'premium', vehicleType: 'yacht', basePrice: 14200000,  emoji: '🛳️', imageUrl: aiImage('large luxury white superyacht megayacht', 504) },
+  { id: 'mbych-yacht',   name: 'Marcedes-Meybach Yacht X', segment: 'premium', vehicleType: 'yacht', basePrice:  5800000,  emoji: '⛵', imageUrl: aiImage('white luxury motor yacht with sleek design', 505) },
 ];
 
 export type SkillKey = 'engine' | 'transmission' | 'chassis' | 'body';
@@ -106,7 +113,7 @@ export const SKILLS: SkillTemplate[] = [
 ];
 
 export function generateUsedCarOffer(segment: Specialization, seed: number) {
-  const pool = CAR_CATALOG.filter((c) => c.segment === segment);
+  const pool = CAR_CATALOG.filter((c) => c.segment === segment && c.vehicleType === 'car');
   if (pool.length === 0) return null;
   const car = pool[seed % pool.length];
   const condition = 0.3 + ((seed * 7919) % 1000) / 1428.5; // 0.3..1.0
