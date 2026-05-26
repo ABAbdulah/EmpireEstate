@@ -70,26 +70,41 @@ interface StoreState {
 }
 
 // Pricing helpers exported for UI use
-export function carFixCost(purchasePrice: string, part: string): Money {
-  // Each part fix costs 4-8% of purchase price
-  const base = M(purchasePrice).times('0.05');
-  return base;
+
+// Each part has its own cost band as a fraction of the car's purchase price.
+// Total of all 4 parts averages ~22% of purchase price.
+const PART_COST_RANGES: Record<string, [number, number]> = {
+  engine:       [0.07, 0.10],
+  transmission: [0.05, 0.07],
+  chassis:      [0.04, 0.06],
+  body:         [0.03, 0.05],
+};
+
+export function carFixCost(purchasePrice: string, part: string, carUid: string = ''): Money {
+  const range = PART_COST_RANGES[part] ?? [0.04, 0.06];
+  // Seeded by car uid + part for stable, per-car pricing
+  let hash = 0;
+  const key = carUid + part;
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) % 1000000;
+  const factor = range[0] + ((hash % 1000) / 1000) * (range[1] - range[0]);
+  return M(purchasePrice).times(factor).ceil();
 }
 
 export function carConditionAfterFix(currentCondition: number): number {
   return Math.min(1, currentCondition + 0.15);
 }
 
-export function carMarketPrice(item: CarInventoryItem, catalogBasePrice: number, segment: string): Money {
+export function carMarketPrice(item: CarInventoryItem, catalogBasePrice: number, _segment: string): Money {
   // Market price = (basePrice * 0.6..1.3 random based on uid) * condition
   // Plus 50% of fixes spent recovered
   // Random factor seeded by uid so it stays stable
   let hash = 0;
   for (let i = 0; i < item.uid.length; i++) hash = (hash * 31 + item.uid.charCodeAt(i)) % 1000000;
   const factor = 0.65 + ((hash % 1000) / 1000) * 0.6; // 0.65..1.25
-  const conditionMult = 0.4 + item.condition * 0.7; // condition 0..1 → 0.4..1.1
+  const condition = typeof item.condition === 'number' ? item.condition : 0.5;
+  const conditionMult = 0.4 + condition * 0.7; // condition 0..1 → 0.4..1.1
   const marketBase = M(catalogBasePrice).times(factor).times(conditionMult);
-  const fixesValue = M(item.fixesSpent).times('0.5');
+  const fixesValue = M(item.fixesSpent ?? '0').times('0.5');
   return marketBase.plus(fixesValue).ceil();
 }
 
@@ -145,7 +160,23 @@ export const useGame = create<StoreState>((set, get) => ({
 
   hydrate: async () => {
     const loaded = await loadState();
-    set({ state: loaded, hydrated: true });
+    // Migrate old saves that don't have new fields yet
+    const migrated: GameState = {
+      ...loaded,
+      activeProjects: loaded.activeProjects ?? [],
+      projectsCompleted: loaded.projectsCompleted ?? {},
+      completedMergers: loaded.completedMergers ?? [],
+      carBusinesses: (loaded.carBusinesses ?? []).map((cb) => ({
+        ...cb,
+        inventory: (cb.inventory ?? []).map((c) => ({
+          ...c,
+          fixesSpent: c.fixesSpent ?? '0',
+          fixedParts: c.fixedParts ?? [],
+          forSale: c.forSale ?? false,
+        })),
+      })),
+    };
+    set({ state: migrated, hydrated: true });
   },
 
   reset: async () => {
@@ -360,8 +391,11 @@ export const useGame = create<StoreState>((set, get) => ({
     const owned = before.businesses[templateId];
     if (!owned || owned.level <= 0 || owned.hasManager) return ZERO;
     const t = businessTemplate(templateId);
-    const cycles = pendingCycles(t, owned.lastCollectedAt, nowMs);
-    if (cycles < 1) return ZERO;
+    // Allow fractional cycles — partial time still gets partial reward
+    const MAX_PENDING_SECONDS = 8 * 3600;
+    const elapsedSec = Math.min((nowMs - owned.lastCollectedAt) / 1000, MAX_PENDING_SECONDS);
+    const cycles = elapsedSec / t.cycleSeconds;
+    if (cycles <= 0) return ZERO;
     const playerLevel = computePlayerLevel(M(before.balance));
     const prestigeMult = new Decimal(1).plus(new Decimal(before.prestigeStars).times('0.02'));
     const businessMult = activeMultiplier(before.boosts, 'business_30', nowMs) * activeMultiplier(before.boosts, 'business_100', nowMs);
@@ -378,7 +412,7 @@ export const useGame = create<StoreState>((set, get) => ({
     const next = produce(before, (draft) => {
       draft.balance = M(draft.balance).plus(reward).toString();
       draft.totalEarned = M(draft.totalEarned).plus(reward).toString();
-      draft.businesses[templateId].lastCollectedAt = owned.lastCollectedAt + cycles * t.cycleSeconds * 1000;
+      draft.businesses[templateId].lastCollectedAt = nowMs;
       draft.businesses[templateId].totalEarned = M(draft.businesses[templateId].totalEarned).plus(reward).toString();
       draft.taxAccrued = M(draft.taxAccrued).plus(reward.times('0.12')).toString();
     });
@@ -394,13 +428,16 @@ export const useGame = create<StoreState>((set, get) => ({
     const businessMult = activeMultiplier(before.boosts, 'business_30', nowMs) * activeMultiplier(before.boosts, 'business_100', nowMs);
     const colMult = computeCollectionMultipliers(before.collections);
     const mergerMult = computeMergerMultiplier(before.completedMergers);
+    const MAX_PENDING_SECONDS = 8 * 3600;
     let total = ZERO;
     const updates: Record<string, { lastCollectedAt: number; addedEarned: Decimal }> = {};
     for (const [id, owned] of Object.entries(before.businesses)) {
       if (owned.level <= 0 || owned.hasManager) continue;
       const t = businessTemplate(id);
-      const cycles = pendingCycles(t, owned.lastCollectedAt, nowMs);
-      if (cycles < 1) continue;
+      // Allow fractional cycles
+      const elapsedSec = Math.min((nowMs - owned.lastCollectedAt) / 1000, MAX_PENDING_SECONDS);
+      const cycles = elapsedSec / t.cycleSeconds;
+      if (cycles <= 0) continue;
       const reward = levelIncomePerCycle(t, owned.level)
         .times(cycles)
         .times(playerLevel.globalIncomeMultiplier)
@@ -411,7 +448,7 @@ export const useGame = create<StoreState>((set, get) => ({
         .times(mergerMult);
       total = total.plus(reward);
       updates[id] = {
-        lastCollectedAt: owned.lastCollectedAt + cycles * t.cycleSeconds * 1000,
+        lastCollectedAt: nowMs,
         addedEarned: reward,
       };
     }
@@ -840,6 +877,7 @@ export const useGame = create<StoreState>((set, get) => ({
       condition,
       acquiredAt: Date.now(),
       fixesSpent: '0',
+      fixedParts: [],
       forSale: false,
     };
     const next = produce(before, (draft) => {
@@ -895,21 +933,22 @@ export const useGame = create<StoreState>((set, get) => ({
     return gained;
   },
 
-  fixCarPart: (businessUid, carUid, _part) => {
+  fixCarPart: (businessUid, carUid, part) => {
     const before = get().state;
     const bizIdx = before.carBusinesses.findIndex((b) => b.uid === businessUid);
     if (bizIdx < 0) return { ok: false, reason: 'Business not found' };
     const car = before.carBusinesses[bizIdx].inventory.find((c) => c.uid === carUid);
     if (!car) return { ok: false, reason: 'Car not found' };
     if (car.forSale) return { ok: false, reason: 'Cannot fix a car that is listed for sale' };
-    if (car.condition >= 1) return { ok: false, reason: 'This part is already in perfect condition' };
-    const cost = carFixCost(car.purchasePrice, _part);
+    if ((car.fixedParts ?? []).includes(part)) return { ok: false, reason: 'This part is already fixed' };
+    const cost = carFixCost(car.purchasePrice, part, car.uid);
     if (M(before.balance).lt(cost)) return { ok: false, reason: 'Insufficient funds' };
     const next = produce(before, (draft) => {
       draft.balance = M(draft.balance).minus(cost).toString();
       draft.totalSpent = M(draft.totalSpent).plus(cost).toString();
       const c = draft.carBusinesses[bizIdx].inventory.find((x) => x.uid === carUid)!;
       c.fixesSpent = M(c.fixesSpent).plus(cost).toString();
+      c.fixedParts = [...(c.fixedParts ?? []), part];
       c.condition = carConditionAfterFix(c.condition);
     });
     set({ state: next });
@@ -925,7 +964,7 @@ export const useGame = create<StoreState>((set, get) => ({
     if (!car) return { ok: false, reason: 'Car not found' };
     if (car.forSale) return { ok: false, reason: 'Already listed for sale' };
     const now = Date.now();
-    const durationMs = (30 + Math.floor(Math.random() * 16)) * 60 * 1000; // 30-45 min
+    const durationMs = (10 + Math.floor(Math.random() * 6)) * 60 * 1000; // 10-15 min
     const next = produce(before, (draft) => {
       const c = draft.carBusinesses[bizIdx].inventory.find((x) => x.uid === carUid)!;
       c.forSale = true;

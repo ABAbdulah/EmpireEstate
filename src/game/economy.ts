@@ -54,8 +54,15 @@ export function pendingCycles(template: BusinessTemplate, lastCollectedAt: numbe
   return Math.floor(elapsedSec / template.cycleSeconds);
 }
 
+// Returns fractional cycles for showing current accumulated earnings
+export function pendingFractionalCycles(template: BusinessTemplate, lastCollectedAt: number, nowMs: number): number {
+  const elapsedSec = Math.min((nowMs - lastCollectedAt) / 1000, MAX_PENDING_SECONDS);
+  if (elapsedSec <= 0) return 0;
+  return elapsedSec / template.cycleSeconds;
+}
+
 export function pendingReward(template: BusinessTemplate, level: number, lastCollectedAt: number, nowMs: number): Money {
-  const cycles = pendingCycles(template, lastCollectedAt, nowMs);
+  const cycles = pendingFractionalCycles(template, lastCollectedAt, nowMs);
   if (cycles <= 0) return ZERO;
   return levelIncomePerCycle(template, level).times(cycles);
 }

@@ -93,23 +93,13 @@ export function BusinessRow({ template, owned, balance, onPress, onCollect, onHi
             <Ionicons name="checkmark-circle" size={14} color={palette.success} />
             <Text style={styles.autoText}>Auto</Text>
           </View>
-        ) : ready ? (
+        ) : (
           <Pressable
             onPress={(e) => { e.stopPropagation(); onCollect?.(); }}
             style={styles.collectBtn}
           >
             <Text style={styles.collectText}>Collect</Text>
             <Text style={styles.collectAmt}>{formatMoney(accumulated)}</Text>
-          </Pressable>
-        ) : (
-          <Pressable
-            disabled={!canHire}
-            onPress={(e) => { e.stopPropagation(); onHire?.(); }}
-            style={[styles.hireBtn, !canHire && styles.hireBtnDisabled]}
-          >
-            <Ionicons name="person-add-outline" size={14} color={canHire ? '#FFFFFF' : palette.textTertiary} />
-            <Text style={[styles.hireText, !canHire && { color: palette.textTertiary }]}>Hire</Text>
-            <Text style={[styles.hireAmt, !canHire && { color: palette.textTertiary }]}>{formatMoney(template.managerCost)}</Text>
           </Pressable>
         )}
       </View>

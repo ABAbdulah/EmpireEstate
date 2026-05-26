@@ -44,6 +44,7 @@ export interface CarInventoryItem {
   condition: number;
   acquiredAt: number;
   fixesSpent: string;              // total money spent fixing this car
+  fixedParts: string[];            // which parts have been fixed: 'engine' | 'transmission' | 'chassis' | 'body'
   forSale: boolean;                // true if listed for auto-sale
   forSaleListedAt?: number;        // when it was listed
   forSaleCompletesAt?: number;     // when it'll auto-sell

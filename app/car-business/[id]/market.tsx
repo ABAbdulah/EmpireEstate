@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert, Image } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -8,6 +8,15 @@ import { palette, radius, shadow, spacing, typography } from '../../../src/theme
 import { formatMoney, M } from '../../../src/lib/money';
 import { CAR_CATALOG, generateUsedCarOffer } from '../../../src/content/carBusiness';
 import { getCarImage } from '../../../src/content/carImages';
+import { ConfirmModal } from '../../../src/components/ConfirmModal';
+import { BuyCarModal } from '../../../src/components/BuyCarModal';
+import { ConditionBar } from '../../../src/components/ConditionBar';
+
+const SHOWROOM_LABEL: Record<'mass' | 'luxury' | 'premium', string> = {
+  mass: 'mass-market',
+  luxury: 'luxury',
+  premium: 'premium',
+};
 
 export default function UsedCarMarket() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -16,6 +25,20 @@ export default function UsedCarMarket() {
   const buy = useGame((s) => s.buyCarForInventory);
   const [filter, setFilter] = useState<'all' | 'favorites'>('all');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [modal, setModal] = useState<{
+    title: string;
+    message: string;
+    icon: keyof typeof Ionicons.glyphMap;
+    variant: 'default' | 'success' | 'danger' | 'warning';
+  } | null>(null);
+  const [pendingBuy, setPendingBuy] = useState<{
+    id: string;
+    name: string;
+    emoji: string;
+    segment: 'mass' | 'luxury' | 'premium';
+    condition: number;
+    askPrice: number;
+  } | null>(null);
 
   const offers = useMemo(() => {
     if (!cb) return [];
@@ -52,42 +75,129 @@ export default function UsedCarMarket() {
         <FilterChip label="Favorites" active={filter === 'favorites'} onPress={() => setFilter('favorites')} />
       </View>
 
+      {cb.inventory.length >= cb.showroomCapacity ? (
+        <View style={styles.fullBanner}>
+          <Ionicons name="warning" size={16} color="#92400E" />
+          <Text style={styles.fullBannerText}>Showroom is full ({cb.inventory.length}/{cb.showroomCapacity}) — sell or list a car first</Text>
+        </View>
+      ) : (
+        <View style={styles.capacityHint}>
+          <Text style={styles.capacityHintText}>Capacity: {cb.inventory.length}/{cb.showroomCapacity}</Text>
+        </View>
+      )}
+
       <ScrollView contentContainerStyle={styles.list}>
-        {offers.map((offer, i) => {
-          const can = M(balance).gte(offer.askPrice);
-          const full = cb.inventory.length >= cb.showroomCapacity;
-          return (
-            <View key={`${offer.id}-${i}`} style={styles.carCard}>
-              <CarImage carId={offer.id} emoji={offer.emoji} segment={offer.segment} />
-              <View style={{ flex: 1, gap: 4 }}>
-                <Text style={styles.carName}>{offer.name}</Text>
-                <View>
-                  <Text style={styles.conditionLabel}>Vehicle condition</Text>
-                  <View style={styles.conditionTrack}>
-                    <View style={[styles.conditionFill, conditionFillStyle(offer.condition)]} />
-                  </View>
-                </View>
-                <Text style={styles.carPrice}>{formatMoney(offer.askPrice)}</Text>
+        {(() => {
+          // De-dupe offers and hide any cars the user already owns
+          const ownedIds = new Set(cb.inventory.map((c) => c.catalogId));
+          const seen = new Set<string>();
+          const visibleOffers = offers.filter((o) => {
+            if (ownedIds.has(o.id)) return false;
+            if (seen.has(o.id)) return false;
+            seen.add(o.id);
+            return true;
+          });
+          if (visibleOffers.length === 0) {
+            return (
+              <View style={styles.emptyState}>
+                <Ionicons name="checkmark-circle" size={36} color={palette.success} />
+                <Text style={styles.emptyTitle}>All caught up</Text>
+                <Text style={styles.emptyDesc}>
+                  You already own every available {SHOWROOM_LABEL[cb.specialization]} model. Sell one to refresh the market.
+                </Text>
               </View>
-              <Pressable
-                disabled={!can || full}
-                onPress={() => {
-                  const ok = buy(cb.uid, offer.id, offer.askPrice.toString(), offer.condition);
-                  if (!ok) {
-                    Alert.alert("Can't add", full ? 'Showroom is full — expand or sell a car first.' : 'Insufficient balance.');
-                  } else {
-                    Alert.alert('Added to showroom', `${offer.name} for ${formatMoney(offer.askPrice)}. View it in the showroom to fix it up or list for sale.`);
-                  }
-                }}
-                style={[styles.addBtn, (!can || full) && styles.addBtnDisabled]}
-              >
-                <Ionicons name="add" size={18} color={(!can || full) ? palette.textTertiary : '#FFFFFF'} />
-              </Pressable>
-            </View>
-          );
-        })}
+            );
+          }
+          return visibleOffers.map((offer, i) => {
+            const can = M(balance).gte(offer.askPrice);
+            const full = cb.inventory.length >= cb.showroomCapacity;
+            return (
+              <View key={`${offer.id}-${i}`} style={styles.carCard}>
+                <CarImage carId={offer.id} emoji={offer.emoji} segment={offer.segment} />
+                <View style={{ flex: 1, gap: 4 }}>
+                  <Text style={styles.carName}>{offer.name}</Text>
+                  <View>
+                    <Text style={styles.conditionLabel}>Vehicle condition</Text>
+                    <ConditionBar value={offer.condition} height={6} />
+                  </View>
+                  <Text style={styles.carPrice}>{formatMoney(offer.askPrice)}</Text>
+                </View>
+                <Pressable
+                  onPress={() => {
+                    if (full) {
+                      setModal({
+                        title: 'Showroom is full',
+                        message: 'Your showroom is at capacity. Sell or list a car first to make room.',
+                        icon: 'warning',
+                        variant: 'warning',
+                      });
+                      return;
+                    }
+                    // Open buy confirmation modal — actual purchase happens on confirm
+                    setPendingBuy({
+                      id: offer.id,
+                      name: offer.name,
+                      emoji: offer.emoji,
+                      segment: offer.segment,
+                      condition: offer.condition,
+                      askPrice: offer.askPrice,
+                    });
+                  }}
+                  style={[styles.addBtn, full && styles.addBtnDisabled]}
+                >
+                  <Ionicons name="add" size={18} color={full ? palette.textTertiary : '#FFFFFF'} />
+                </Pressable>
+              </View>
+            );
+          });
+        })()}
         <View style={{ height: 80 }} />
       </ScrollView>
+
+      <ConfirmModal
+        visible={!!modal}
+        title={modal?.title ?? ''}
+        message={modal?.message}
+        icon={modal?.icon}
+        variant={modal?.variant ?? 'default'}
+        confirmLabel="OK"
+        onCancel={() => setModal(null)}
+        onConfirm={() => setModal(null)}
+      />
+
+      {pendingBuy ? (
+        <BuyCarModal
+          visible={!!pendingBuy}
+          carId={pendingBuy.id}
+          name={pendingBuy.name}
+          emoji={pendingBuy.emoji}
+          segment={pendingBuy.segment}
+          condition={pendingBuy.condition}
+          askPrice={pendingBuy.askPrice}
+          canAfford={M(balance).gte(pendingBuy.askPrice)}
+          onCancel={() => setPendingBuy(null)}
+          onConfirm={() => {
+            const offer = pendingBuy;
+            setPendingBuy(null);
+            const ok = buy(cb.uid, offer.id, offer.askPrice.toString(), offer.condition);
+            if (!ok) {
+              setModal({
+                title: "Couldn't add car",
+                message: 'Something went wrong. Please try again.',
+                icon: 'alert-circle',
+                variant: 'danger',
+              });
+            } else {
+              setModal({
+                title: 'Added to showroom!',
+                message: `${offer.name} added for ${formatMoney(offer.askPrice)}. Go to the showroom to fix it up or list it for sale.`,
+                icon: 'checkmark-circle',
+                variant: 'success',
+              });
+            }
+          }}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -155,4 +265,11 @@ const styles = StyleSheet.create({
   carPrice: { ...typography.title, color: palette.textPrimary, marginTop: 4 },
   addBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: palette.primary, alignItems: 'center', justifyContent: 'center' },
   addBtnDisabled: { backgroundColor: palette.surfaceAlt },
+  fullBanner: { flexDirection: 'row', alignItems: 'center', gap: 8, marginHorizontal: spacing.lg, marginBottom: spacing.sm, padding: spacing.md, backgroundColor: '#FEF3C7', borderRadius: radius.md },
+  fullBannerText: { ...typography.caption, color: '#92400E', flex: 1, fontWeight: '600' },
+  capacityHint: { marginHorizontal: spacing.lg, marginBottom: spacing.sm },
+  capacityHintText: { ...typography.micro, color: palette.textTertiary },
+  emptyState: { alignItems: 'center', gap: spacing.sm, padding: spacing.xl, marginHorizontal: spacing.lg, backgroundColor: palette.surface, borderRadius: radius.lg },
+  emptyTitle: { ...typography.title, color: palette.textPrimary, marginTop: spacing.sm },
+  emptyDesc: { ...typography.caption, color: palette.textSecondary, textAlign: 'center' },
 });

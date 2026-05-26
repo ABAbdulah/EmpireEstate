@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View, Pressable, Alert, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +8,8 @@ import { CAR_CATALOG } from '../../../../src/content/carBusiness';
 import { getCarImage } from '../../../../src/content/carImages';
 import { palette, radius, shadow, spacing, typography } from '../../../../src/theme';
 import { formatMoney, M } from '../../../../src/lib/money';
+import { ConfirmModal } from '../../../../src/components/ConfirmModal';
+import { ConditionBar } from '../../../../src/components/ConditionBar';
 
 const PARTS: Array<{ id: 'engine' | 'transmission' | 'chassis' | 'body'; label: string; icon: keyof typeof import('@expo/vector-icons').Ionicons.glyphMap }> = [
   { id: 'engine',       label: 'Engine',       icon: 'flash-outline' },
@@ -24,12 +26,8 @@ export default function CarDetail() {
   const listForSale = useGame((s) => s.listCarForSale);
   const cancelListing = useGame((s) => s.cancelCarListing);
 
-  // Tick every second to keep countdown live
-  const [, setNow] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
+  const [confirmSell, setConfirmSell] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const car = cb?.inventory.find((c) => c.uid === uid);
   const tmpl = useMemo(() => car ? CAR_CATALOG.find((c) => c.id === car.catalogId) : null, [car]);
@@ -55,18 +53,6 @@ export default function CarDetail() {
   const localImg = getCarImage(tmpl.id);
   const isPerfectCondition = car.condition >= 0.999;
 
-  // For-sale countdown
-  let timeRemaining = '';
-  let progressPct = 0;
-  if (car.forSale && car.forSaleListedAt && car.forSaleCompletesAt) {
-    const total = car.forSaleCompletesAt - car.forSaleListedAt;
-    const elapsed = Date.now() - car.forSaleListedAt;
-    progressPct = Math.min(100, (elapsed / total) * 100);
-    const remainingMs = Math.max(0, car.forSaleCompletesAt - Date.now());
-    const mins = Math.floor(remainingMs / 60000);
-    const secs = Math.floor((remainingMs % 60000) / 1000);
-    timeRemaining = `${mins}m ${secs}s`;
-  }
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -88,16 +74,13 @@ export default function CarDetail() {
           )}
         </View>
 
-        {/* Sale countdown */}
+        {/* Sale banner — no countdown shown to user */}
         {car.forSale ? (
           <View style={styles.saleBanner}>
-            <Ionicons name="time-outline" size={18} color="#92400E" />
+            <Ionicons name="pricetag" size={18} color="#92400E" />
             <View style={{ flex: 1 }}>
               <Text style={styles.saleBannerTitle}>Listed for sale</Text>
-              <Text style={styles.saleBannerSub}>Auto-sells in {timeRemaining}</Text>
-              <View style={styles.saleBarTrack}>
-                <View style={[styles.saleBarFill, { width: `${progressPct}%` }]} />
-              </View>
+              <Text style={styles.saleBannerSub}>Waiting for a buyer — proceeds will be added to your balance when sold.</Text>
             </View>
           </View>
         ) : null}
@@ -112,16 +95,9 @@ export default function CarDetail() {
           <SpecRow label="Total cost" value={formatMoney(totalCost.toString())} />
           <View style={styles.conditionRow}>
             <Text style={styles.specLabel}>Condition</Text>
-            <View style={styles.conditionTrack}>
-              <View style={[
-                styles.conditionFill,
-                {
-                  width: `${Math.round(car.condition * 100)}%`,
-                  backgroundColor: car.condition >= 0.75 ? palette.success : car.condition >= 0.5 ? '#F59E0B' : palette.danger,
-                },
-              ]} />
+            <View style={{ flex: 1 }}>
+              <ConditionBar value={car.condition} height={8} showPercent />
             </View>
-            <Text style={styles.conditionPct}>{Math.round(car.condition * 100)}%</Text>
           </View>
         </View>
 
@@ -138,74 +114,99 @@ export default function CarDetail() {
         </View>
 
         {/* Fix actions */}
-        {!car.forSale && !isPerfectCondition ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Improve condition</Text>
-            <Text style={styles.sectionDesc}>Each fix increases condition by 15% and boosts market price.</Text>
-            <View style={styles.partsGrid}>
-              {PARTS.map((part) => {
-                const cost = carFixCost(car.purchasePrice, part.id);
-                const can = M(balance).gte(cost);
-                return (
-                  <Pressable
-                    key={part.id}
-                    disabled={!can}
-                    onPress={() => {
-                      const res = fix(cb.uid, car.uid, part.id);
-                      if (!res.ok) Alert.alert("Can't fix", res.reason ?? 'Failed');
-                    }}
-                    style={[styles.partTile, !can && styles.partTileDisabled]}
-                  >
-                    <Ionicons name={part.icon} size={22} color={can ? palette.primary : palette.textTertiary} />
-                    <Text style={[styles.partLabel, !can && { color: palette.textTertiary }]}>{part.label}</Text>
-                    <Text style={[styles.partCost, !can && { color: palette.textTertiary }]}>{formatMoney(cost)}</Text>
-                  </Pressable>
-                );
-              })}
+        {(() => {
+          const fixed = car.fixedParts ?? [];
+          const remainingParts = PARTS.filter((p) => !fixed.includes(p.id));
+          if (car.forSale || remainingParts.length === 0) return null;
+          return (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Improve condition</Text>
+              <Text style={styles.sectionDesc}>
+                {fixed.length > 0
+                  ? `${fixed.length} of 4 parts fixed. Each fix adds 15% to condition.`
+                  : 'Each fix increases condition by 15% and boosts market price.'}
+              </Text>
+              <View style={styles.partsGrid}>
+                {remainingParts.map((part) => {
+                  const cost = carFixCost(car.purchasePrice, part.id, car.uid);
+                  const can = M(balance).gte(cost);
+                  return (
+                    <Pressable
+                      key={part.id}
+                      disabled={!can}
+                      onPress={() => {
+                        const res = fix(cb.uid, car.uid, part.id);
+                        if (!res.ok) Alert.alert("Can't fix", res.reason ?? 'Failed');
+                      }}
+                      style={[styles.partTile, !can && styles.partTileDisabled]}
+                    >
+                      <Ionicons name={part.icon} size={22} color={can ? palette.primary : palette.textTertiary} />
+                      <Text style={[styles.partLabel, !can && { color: palette.textTertiary }]}>{part.label}</Text>
+                      <Text style={[styles.partCost, !can && { color: palette.textTertiary }]}>{formatMoney(cost)}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              {fixed.length > 0 ? (
+                <View style={styles.fixedRow}>
+                  {fixed.map((p) => {
+                    const def = PARTS.find((x) => x.id === p);
+                    return (
+                      <View key={p} style={styles.fixedChip}>
+                        <Ionicons name="checkmark-circle" size={12} color={palette.success} />
+                        <Text style={styles.fixedChipText}>{def?.label ?? p}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : null}
             </View>
-          </View>
-        ) : null}
+          );
+        })()}
 
         {/* Sell / cancel */}
         <View style={styles.footer}>
           {!car.forSale ? (
-            <Pressable
-              style={styles.sellBtn}
-              onPress={() => {
-                Alert.alert(
-                  'List for sale?',
-                  `Market price: ${formatMoney(marketPrice)}\n\nIt will auto-sell in 30-45 minutes and the proceeds go to your balance.`,
-                  [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                      text: 'List for sale',
-                      onPress: () => {
-                        const res = listForSale(cb.uid, car.uid);
-                        if (!res.ok) Alert.alert("Can't list", res.reason ?? 'Failed');
-                      },
-                    },
-                  ]
-                );
-              }}
-            >
+            <Pressable style={styles.sellBtn} onPress={() => setConfirmSell(true)}>
               <Ionicons name="pricetag-outline" size={18} color="#FFFFFF" />
               <Text style={styles.sellBtnText}>Sell for {formatMoney(marketPrice)}</Text>
             </Pressable>
           ) : (
-            <Pressable
-              style={styles.cancelBtn}
-              onPress={() => {
-                Alert.alert('Cancel listing?', 'The car will go back to your fleet.', [
-                  { text: 'No', style: 'cancel' },
-                  { text: 'Yes, cancel', style: 'destructive', onPress: () => cancelListing(cb.uid, car.uid) },
-                ]);
-              }}
-            >
+            <Pressable style={styles.cancelBtn} onPress={() => setConfirmCancel(true)}>
               <Text style={styles.cancelBtnText}>Cancel listing</Text>
             </Pressable>
           )}
         </View>
       </ScrollView>
+
+      <ConfirmModal
+        visible={confirmSell}
+        title="List this car for sale?"
+        message={`Market price: ${formatMoney(marketPrice)}\n\nOnce listed, the car will be sold and the proceeds added to your balance.`}
+        icon="pricetag"
+        variant="success"
+        confirmLabel="List for sale"
+        onCancel={() => setConfirmSell(false)}
+        onConfirm={() => {
+          setConfirmSell(false);
+          const res = listForSale(cb.uid, car.uid);
+          if (!res.ok) Alert.alert("Can't list", res.reason ?? 'Failed');
+        }}
+      />
+
+      <ConfirmModal
+        visible={confirmCancel}
+        title="Cancel listing?"
+        message="The car will be returned to your fleet."
+        icon="arrow-undo"
+        variant="warning"
+        confirmLabel="Yes, cancel"
+        onCancel={() => setConfirmCancel(false)}
+        onConfirm={() => {
+          setConfirmCancel(false);
+          cancelListing(cb.uid, car.uid);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -251,6 +252,9 @@ const styles = StyleSheet.create({
   partTileDisabled: { opacity: 0.5 },
   partLabel: { ...typography.bodyMedium, color: palette.textPrimary, fontWeight: '600' },
   partCost: { ...typography.caption, color: palette.primary, fontWeight: '700' },
+  fixedRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: spacing.sm },
+  fixedChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: spacing.sm, paddingVertical: 4, backgroundColor: palette.successSoft, borderRadius: radius.pill },
+  fixedChipText: { ...typography.micro, color: palette.success, fontWeight: '700' },
   footer: { padding: spacing.lg },
   sellBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: spacing.md, backgroundColor: palette.success, borderRadius: radius.pill },
   sellBtnText: { ...typography.bodyMedium, color: '#FFFFFF', fontWeight: '700' },
