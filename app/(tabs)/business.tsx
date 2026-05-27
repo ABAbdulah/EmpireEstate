@@ -121,7 +121,6 @@ export default function BusinessScreen() {
             <Text style={styles.sectionTitle}>Car businesses</Text>
             {state.carBusinesses.map((cb) => {
               const spec = SPECIALIZATIONS.find((s) => s.id === cb.specialization);
-              const hourly = M(spec?.baseHourlyPerVehicle ?? '0').times(cb.inventory.length);
               return (
                 <Pressable
                   key={cb.uid}
@@ -134,7 +133,7 @@ export default function BusinessScreen() {
                   <View style={{ flex: 1 }}>
                     <Text style={styles.carName}>{cb.name}</Text>
                     <Text style={styles.carMeta}>{cb.showroomType === 'used' ? 'Used' : 'New'} · {cb.showroomCapacity} places · {spec?.label}</Text>
-                    <Text style={styles.carInventory}>{cb.inventory.length}/{cb.showroomCapacity} vehicles · {formatMoney(hourly)}/hr</Text>
+                    <Text style={styles.carInventory}>{cb.inventory.length}/{cb.showroomCapacity} vehicles in showroom</Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={palette.textTertiary} />
                 </Pressable>

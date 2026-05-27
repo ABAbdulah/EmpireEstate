@@ -16,7 +16,6 @@ export default function CarBusinessDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const cb = useGame((s) => s.state.carBusinesses.find((b) => b.uid === id));
   const balance = useGame((s) => s.state.balance);
-  const collect = useGame((s) => s.collectCarBusiness);
   const buyService = useGame((s) => s.buyCarServiceForBusiness);
   const setSpec = useGame((s) => s.setCarSpecialization);
 
@@ -38,11 +37,6 @@ export default function CarBusinessDetail() {
 
   const spec = SPECIALIZATIONS.find((s) => s.id === cb.specialization)!;
   const specEmoji = cb.specialization === 'premium' ? '🏎️' : cb.specialization === 'luxury' ? '🚗' : '🚙';;
-  const hourly = M(spec.baseHourlyPerVehicle).times(cb.inventory.length);
-  const pending = useMemo(() => {
-    const elapsed = (Date.now() - cb.lastCollectedAt) / 1000;
-    return M(spec.baseHourlyPerVehicle).times(cb.inventory.length).times(elapsed).div(3600);
-  }, [cb.lastCollectedAt, cb.inventory.length, spec]);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -63,12 +57,6 @@ export default function CarBusinessDetail() {
             <Text style={styles.headerName}>{cb.name}</Text>
           </View>
         </LinearGradient>
-
-        <View style={styles.pendingCard}>
-          <Text style={styles.pendingValue}>{formatMoney(pending)}</Text>
-          <Text style={styles.pendingLabel}>Pending</Text>
-          <Button label="Collect" onPress={() => collect(cb.uid, Date.now())} style={{ marginTop: spacing.md }} />
-        </View>
 
         {cb.serviceSize ? (
           <View style={styles.serviceCard}>
@@ -189,7 +177,7 @@ export default function CarBusinessDetail() {
 
         <View style={styles.statsCard}>
           <Stat label="Earnings all time" value={formatMoney(cb.totalEarned)} />
-          <Stat label="Income per hour" value={`${formatMoney(hourly)}/hr`} />
+          <Stat label="Cars in showroom" value={`${cb.inventory.length}/${cb.showroomCapacity}`} />
           <Stat label="Specialization" value={spec.label} />
           <Stat label="Avg price (segment)" value={formatMoney(spec.avgPrice)} last />
         </View>
@@ -229,7 +217,7 @@ export default function CarBusinessDetail() {
 
       <BottomSheet visible={specSheet} onClose={() => setSpecSheet(false)}>
         <Text style={styles.sheetTitle}>Change specialization</Text>
-        <Text style={styles.sheetSubtitle}>This affects which cars appear in your market and your hourly income.</Text>
+        <Text style={styles.sheetSubtitle}>This affects which cars appear in your market.</Text>
         {SPECIALIZATIONS.map((s) => {
           const active = s.id === cb.specialization;
           return (

@@ -65,24 +65,39 @@ function aiImage(prompt: string, seed: number): string {
 }
 
 export const CAR_CATALOG: CarCatalogEntry[] = [
-  // Mass — economy hatchbacks & sedans
-  { id: 'vw-golv',       name: 'Volkswagon Golv',          segment: 'mass',    vehicleType: 'car',   basePrice:  21500,    emoji: '🚙', imageUrl: aiImage('compact silver hatchback car, modern european design', 101) },
-  { id: 'renolt-logon',  name: 'Renolt Logon',             segment: 'mass',    vehicleType: 'car',   basePrice:  18900,    emoji: '🚗', imageUrl: aiImage('budget white sedan car, simple economy car', 102) },
-  { id: 'alfo-tonnle',   name: 'Alfo Romeus Tonnle',       segment: 'mass',    vehicleType: 'car',   basePrice:  28400,    emoji: '🚘', imageUrl: aiImage('compact red italian crossover SUV', 103) },
-  { id: 'toyoda-corla',  name: 'Toyoda Corla',             segment: 'mass',    vehicleType: 'car',   basePrice:  22300,    emoji: '🚖', imageUrl: aiImage('silver japanese compact sedan, reliable family car', 104) },
-  { id: 'hondo-civica',  name: 'Hondo Civica',             segment: 'mass',    vehicleType: 'car',   basePrice:  24800,    emoji: '🚗', imageUrl: aiImage('blue compact japanese sedan, sporty hatchback', 105) },
-  // Luxury — premium sedans & SUVs
-  { id: 'auddi-a6',      name: 'Auddi A6',                 segment: 'luxury',  vehicleType: 'car',   basePrice: 168000,    emoji: '🚘', imageUrl: aiImage('silver german luxury executive sedan', 201) },
-  { id: 'tkm-xbov',      name: 'TKM X-BOV',                segment: 'luxury',  vehicleType: 'car',   basePrice: 195000,    emoji: '🏎️', imageUrl: aiImage('black luxury sports sedan, aggressive design', 202) },
-  { id: 'alfo-julia',    name: 'Alfo Romeus Julia',        segment: 'luxury',  vehicleType: 'car',   basePrice: 172500,    emoji: '🚙', imageUrl: aiImage('red italian luxury sport sedan', 203) },
-  { id: 'dmw-m8',        name: 'DMW M8 Grand Coupe',       segment: 'luxury',  vehicleType: 'car',   basePrice: 156000,    emoji: '🚘', imageUrl: aiImage('black german grand coupe luxury sports car', 204) },
-  { id: 'lezus-450',     name: 'Lezus 450',                segment: 'luxury',  vehicleType: 'car',   basePrice:  51700,    emoji: '🚗', imageUrl: aiImage('silver japanese luxury sedan, refined design', 205) },
-  { id: 'genetic-c90',   name: 'Genetic C90',              segment: 'luxury',  vehicleType: 'car',   basePrice: 107900,    emoji: '🚙', imageUrl: aiImage('white luxury sedan, korean premium car', 206) },
-  { id: 'mercedes-gls',  name: 'Marcedes-Meybach GLS',     segment: 'luxury',  vehicleType: 'car',   basePrice: 130900,    emoji: '🚙', imageUrl: aiImage('black german luxury full-size SUV', 207) },
-  // Premium supercars
-  { id: 'ferarry-v60',   name: 'Ferarry V60',              segment: 'premium', vehicleType: 'car',   basePrice: 6800000,   emoji: '🏎️', imageUrl: aiImage('red italian supercar, exotic sports car', 301) },
-  { id: 'mercedes-exo',  name: 'Marcedes-Maybech Exolero', segment: 'premium', vehicleType: 'car',   basePrice: 9200000,   emoji: '🏎️', imageUrl: aiImage('silver german hypercar, exotic supercar', 302) },
-  { id: 'macleran-b1',   name: 'MacLeran B1',              segment: 'premium', vehicleType: 'car',   basePrice: 7400000,   emoji: '🏁', imageUrl: aiImage('orange british supercar, mid-engine exotic', 303) },
+  // Mass — economy hatchbacks & sedans (10 cars)
+  { id: 'vw-golv',          name: 'Volkswagon Golv',         segment: 'mass',    vehicleType: 'car',   basePrice:  21500,    emoji: '🚙', imageUrl: aiImage('compact silver hatchback car, modern european design', 101) },
+  { id: 'renolt-logon',     name: 'Renolt Logon',            segment: 'mass',    vehicleType: 'car',   basePrice:  18900,    emoji: '🚗', imageUrl: aiImage('budget white sedan car, simple economy car', 102) },
+  { id: 'alfo-tonnle',      name: 'Alfo Romeus Tonnle',      segment: 'mass',    vehicleType: 'car',   basePrice:  28400,    emoji: '🚘', imageUrl: aiImage('compact red italian crossover SUV', 103) },
+  { id: 'toyoda-corla',     name: 'Toyoda Corla',            segment: 'mass',    vehicleType: 'car',   basePrice:  22300,    emoji: '🚖', imageUrl: aiImage('silver japanese compact sedan, reliable family car', 104) },
+  { id: 'hondo-civica',     name: 'Hondo Civica',            segment: 'mass',    vehicleType: 'car',   basePrice:  24800,    emoji: '🚗', imageUrl: aiImage('blue compact japanese sedan, sporty hatchback', 105) },
+  { id: 'nezzan-altimo',    name: 'Nezzan Altimo',           segment: 'mass',    vehicleType: 'car',   basePrice:  26500,    emoji: '🚗', imageUrl: aiImage('grey japanese mid-size sedan, sporty family car', 106) },
+  { id: 'masda-3sx',        name: 'Masda 3SX',               segment: 'mass',    vehicleType: 'car',   basePrice:  23800,    emoji: '🚙', imageUrl: aiImage('red japanese compact hatchback, modern design', 107) },
+  { id: 'hyandai-elontra',  name: 'Hyandai Elontra',         segment: 'mass',    vehicleType: 'car',   basePrice:  20900,    emoji: '🚗', imageUrl: aiImage('blue korean compact sedan, modern design', 108) },
+  { id: 'chevrolat-cruzo',  name: 'Chevrolat Cruzo',         segment: 'mass',    vehicleType: 'car',   basePrice:  19500,    emoji: '🚘', imageUrl: aiImage('white american compact sedan, family economy car', 109) },
+  { id: 'forde-fucos',      name: 'Forde Fucos',             segment: 'mass',    vehicleType: 'car',   basePrice:  21900,    emoji: '🚙', imageUrl: aiImage('silver american compact hatchback, sporty design', 110) },
+
+  // Luxury — premium sedans, SUVs & coupes (10 cars)
+  { id: 'auddi-a6',         name: 'Auddi A6',                segment: 'luxury',  vehicleType: 'car',   basePrice: 168000,    emoji: '🚘', imageUrl: aiImage('silver german luxury executive sedan', 201) },
+  { id: 'tkm-xbov',         name: 'TKM X-BOV',               segment: 'luxury',  vehicleType: 'car',   basePrice: 195000,    emoji: '🏎️', imageUrl: aiImage('black luxury sports sedan, aggressive design', 202) },
+  { id: 'alfo-julia',       name: 'Alfo Romeus Julia',       segment: 'luxury',  vehicleType: 'car',   basePrice: 172500,    emoji: '🚙', imageUrl: aiImage('red italian luxury sport sedan', 203) },
+  { id: 'dmw-m8',           name: 'DMW M8 Grand Coupe',      segment: 'luxury',  vehicleType: 'car',   basePrice: 156000,    emoji: '🚘', imageUrl: aiImage('black german grand coupe luxury sports car', 204) },
+  { id: 'lezus-450',        name: 'Lezus 450',               segment: 'luxury',  vehicleType: 'car',   basePrice:  51700,    emoji: '🚗', imageUrl: aiImage('silver japanese luxury sedan, refined design', 205) },
+  { id: 'genetic-c90',      name: 'Genetic C90',             segment: 'luxury',  vehicleType: 'car',   basePrice: 107900,    emoji: '🚙', imageUrl: aiImage('white luxury sedan, korean premium car', 206) },
+  { id: 'mercedes-gls',     name: 'Marcedes-Meybach GLS',    segment: 'luxury',  vehicleType: 'car',   basePrice: 130900,    emoji: '🚙', imageUrl: aiImage('black german luxury full-size SUV', 207) },
+  { id: 'porshe-cayman',    name: 'Porshe Cayman',           segment: 'luxury',  vehicleType: 'car',   basePrice: 115000,    emoji: '🏎️', imageUrl: aiImage('yellow german mid-engine sports coupe', 208) },
+  { id: 'jaguar-xfr',       name: 'Jaguar XFR',              segment: 'luxury',  vehicleType: 'car',   basePrice:  92000,    emoji: '🚘', imageUrl: aiImage('british luxury sport sedan, elegant design', 209) },
+  { id: 'volvio-s90',       name: 'Volvio S90',              segment: 'luxury',  vehicleType: 'car',   basePrice:  78000,    emoji: '🚗', imageUrl: aiImage('swedish luxury executive sedan, scandinavian design', 210) },
+
+  // Premium — supercars & hypercars (8 cars)
+  { id: 'ferarry-v60',      name: 'Ferarry V60',             segment: 'premium', vehicleType: 'car',   basePrice: 6800000,   emoji: '🏎️', imageUrl: aiImage('red italian supercar, exotic sports car', 301) },
+  { id: 'mercedes-exo',     name: 'Marcedes-Maybech Exolero', segment: 'premium', vehicleType: 'car',   basePrice: 9200000,  emoji: '🏎️', imageUrl: aiImage('silver german hypercar, exotic supercar', 302) },
+  { id: 'macleran-b1',      name: 'MacLeran B1',             segment: 'premium', vehicleType: 'car',   basePrice: 7400000,   emoji: '🏁', imageUrl: aiImage('orange british supercar, mid-engine exotic', 303) },
+  { id: 'lambrogini-uros',  name: 'Lambrogini Uros',         segment: 'premium', vehicleType: 'car',   basePrice: 4500000,   emoji: '🏎️', imageUrl: aiImage('yellow italian luxury supercar SUV', 304) },
+  { id: 'lambrogini-huri',  name: 'Lambrogini Hurican',      segment: 'premium', vehicleType: 'car',   basePrice: 5800000,   emoji: '🏎️', imageUrl: aiImage('green italian supercar, V10 mid-engine exotic', 305) },
+  { id: 'bugatii-chrion',   name: 'Bugatii Chrion',          segment: 'premium', vehicleType: 'car',   basePrice: 12500000,  emoji: '🏁', imageUrl: aiImage('blue and black french hypercar, ultra exclusive', 306) },
+  { id: 'aston-vantash',    name: 'Aston Martan Vantash',    segment: 'premium', vehicleType: 'car',   basePrice: 3800000,   emoji: '🏎️', imageUrl: aiImage('british grey grand tourer luxury sports car', 307) },
+  { id: 'koenig-jetska',    name: 'Koenig Jetska',           segment: 'premium', vehicleType: 'car',   basePrice: 11000000,  emoji: '🏁', imageUrl: aiImage('swedish hypercar, lightweight track-focused exotic', 308) },
   // Luxury boats & yachts
   { id: 'ferarry-jet',   name: 'Ferarry Jet Tender 29',    segment: 'luxury',  vehicleType: 'boat',  basePrice:  320000,   emoji: '🚤', imageUrl: aiImage('luxury speedboat tender, red and white sport boat', 401) },
   { id: 'lezus-marine',  name: 'Lezus Marine LX-500',      segment: 'luxury',  vehicleType: 'boat',  basePrice:  285000,   emoji: '⛵', imageUrl: aiImage('white luxury cabin cruiser boat', 402) },
