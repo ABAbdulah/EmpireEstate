@@ -57,7 +57,7 @@ foreach ($entry in $cars) {
     $id = $parts[0]
     $seed = $parts[1]
     $prompt = $parts[2]
-    $file = Join-Path $outDir ($id + '.png')
+    $file = Join-Path $outDir ($id + '.jpg')
 
     if (Test-Path $file) {
         $size = (Get-Item $file).Length
