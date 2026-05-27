@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { showAlert } from '../../src/components/GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBottomPadding } from '../../src/hooks/useBottomPadding';
@@ -188,10 +189,15 @@ export default function NewsScreen() {
                 <Pressable
                   style={styles.watchAdBtn}
                   onPress={() => {
-                    Alert.alert('Watch Ad', 'Simulating ad... Signals unlocked for today!', [
-                      { text: 'Watch', onPress: () => setSignalsUnlocked(true) },
-                      { text: 'Cancel', style: 'cancel' },
-                    ]);
+                    showAlert({
+                      title: 'Watch Ad',
+                      message: 'Watch a short ad to unlock signals for today.',
+                      icon: 'play-circle',
+                      variant: 'success',
+                      confirmLabel: 'Watch',
+                      cancelLabel: 'Cancel',
+                      onConfirm: () => setSignalsUnlocked(true),
+                    });
                   }}
                 >
                   <Ionicons name="play-circle" size={15} color="#FFFFFF" />

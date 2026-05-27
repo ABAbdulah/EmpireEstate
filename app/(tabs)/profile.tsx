@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { showAlert } from '../../src/components/GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import Decimal from 'decimal.js';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -111,7 +112,7 @@ export default function ProfileScreen() {
               disabled={taxDue.lte(0)}
               onPress={() => {
                 const ok = payTaxes();
-                if (!ok) Alert.alert("Can't pay", "Insufficient balance to pay taxes.");
+                if (!ok) showAlert({ title: "Can't pay taxes", message: 'Insufficient balance to pay taxes.', icon: 'cash-outline', variant: 'danger' });
               }}
             />
           </View>
@@ -125,10 +126,15 @@ export default function ProfileScreen() {
         </View>
 
         <Pressable
-          onPress={() => Alert.alert('Reset?', 'This will erase all progress. For testing only.', [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Reset', style: 'destructive', onPress: () => resetGame() },
-          ])}
+          onPress={() => showAlert({
+            title: 'Reset all progress?',
+            message: 'This will erase all progress. This action cannot be undone.',
+            icon: 'trash',
+            variant: 'danger',
+            confirmLabel: 'Yes, reset',
+            cancelLabel: 'Cancel',
+            onConfirm: () => resetGame(),
+          })}
           style={styles.resetBtn}
         >
           <Text style={styles.resetText}>Reset progress (dev)</Text>

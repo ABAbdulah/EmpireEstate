@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Pressable } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Pressable } from 'react-native';
+import { showAlert } from '../../../src/components/GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -159,10 +160,10 @@ export default function StockDetailScreen() {
               onPress={() => {
                 if (mode === 'buy') {
                   const ok = buy(ticker, qtyNum, snap.price);
-                  if (!ok) Alert.alert("Can't buy", `Need ${formatMoney(total)} to buy ${qtyNum} ${ticker}.`);
+                  if (!ok) showAlert({ title: "Can't buy", message: `You need ${formatMoney(total)} to buy ${qtyNum} ${ticker}.`, icon: 'cash-outline', variant: 'danger' });
                 } else {
                   const ok = sell(ticker, qtyNum, snap.price);
-                  if (!ok) Alert.alert("Can't sell", `You only own ${owned?.quantity ?? 0} pcs.`);
+                  if (!ok) showAlert({ title: "Can't sell", message: `You only own ${owned?.quantity ?? 0} shares.`, icon: 'alert-circle', variant: 'danger' });
                 }
               }}
               style={[styles.tradeBtn, mode === 'sell' && styles.tradeBtnSell, !(mode === 'buy' ? canBuy : canSell) && styles.tradeBtnDisabled]}

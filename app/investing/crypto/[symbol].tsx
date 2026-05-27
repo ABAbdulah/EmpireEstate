@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Pressable } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Pressable } from 'react-native';
+import { showAlert } from '../../../src/components/GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -146,10 +147,10 @@ export default function CryptoDetailScreen() {
               onPress={() => {
                 if (mode === 'buy') {
                   const ok = buy(symbol, qtyNum, snap.price);
-                  if (!ok) Alert.alert("Can't buy", `Need ${formatMoney(total)} to buy ${qtyNum} ${symbol}.`);
+                  if (!ok) showAlert({ title: "Can't buy", message: `You need ${formatMoney(total)} to buy ${qtyNum} ${symbol}.`, icon: 'cash-outline', variant: 'danger' });
                 } else {
                   const ok = sell(symbol, qtyNum, snap.price);
-                  if (!ok) Alert.alert("Can't sell", `You only own ${owned?.quantity?.toFixed(4) ?? 0} ${symbol}.`);
+                  if (!ok) showAlert({ title: "Can't sell", message: `You only own ${owned?.quantity?.toFixed(4) ?? 0} ${symbol}.`, icon: 'alert-circle', variant: 'danger' });
                 }
               }}
               style={[styles.tradeBtn, mode === 'sell' && styles.tradeBtnSell, !(mode === 'buy' ? canBuy : canSell) && styles.tradeBtnDisabled]}

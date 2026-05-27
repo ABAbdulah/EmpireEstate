@@ -281,6 +281,42 @@ function CryptoView() {
         </View>
       </View>
 
+      {Object.keys(state.cryptos).length > 0 ? (
+        <>
+          <Text style={styles.listHeader}>Your holdings · {Object.keys(state.cryptos).length}</Text>
+          {Object.values(state.cryptos).map((owned) => {
+            const snap = snapshots.find((s) => s.symbol === owned.symbol);
+            if (!snap) return null;
+            const value = new Decimal(snap.price).times(owned.quantity);
+            const cost = new Decimal(owned.avgCost).times(owned.quantity);
+            const pl = value.minus(cost);
+            const plPct = cost.gt(0) ? pl.div(cost).times(100) : new Decimal(0);
+            const up = pl.gte(0);
+            const priceStr = snap.price < 1 ? snap.price.toFixed(4) : snap.price.toFixed(2);
+            return (
+              <Pressable key={`held-${owned.symbol}`} style={styles.stockRow} onPress={() => router.push(`/investing/crypto/${owned.symbol}` as any)}>
+                <View style={[styles.stockTickerCircle, { backgroundColor: snap.template.color + '22' }]}>
+                  <Text style={[styles.stockTickerText, { color: snap.template.color }]}>{owned.symbol.slice(0, 2)}</Text>
+                </View>
+                <View style={styles.stockBody}>
+                  <Text style={styles.stockTicker}>{owned.symbol}</Text>
+                  <Text style={styles.stockName}>{owned.quantity.toFixed(4)} · {formatMoney(value)}</Text>
+                </View>
+                <View style={styles.stockMid}>
+                  <Sparkline data={snap.series} width={56} height={22} color={up ? palette.success : palette.danger} showFill={false} />
+                </View>
+                <View style={styles.stockRight}>
+                  <Text style={styles.stockPrice}>${priceStr}</Text>
+                  <Text style={[styles.stockChange, { color: up ? palette.success : palette.danger }]}>
+                    {up ? '▲' : '▼'} {Math.abs(plPct.toNumber()).toFixed(2)}%
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </>
+      ) : null}
+
       <Text style={styles.listHeader}>Markets · {visible.length} available</Text>
       {visible.map((c) => {
         const owned = state.cryptos[c.symbol];

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { showAlert } from '../../src/components/GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -149,7 +150,7 @@ export default function BusinessDetail() {
                 disabled={balance.lt(template.managerCost)}
                 onPress={() => {
                   const ok = hire(template.id);
-                  if (!ok) Alert.alert("Can't afford", `Manager costs ${formatMoney(template.managerCost)}.`);
+                  if (!ok) showAlert({ title: "Can't afford manager", message: `Manager costs ${formatMoney(template.managerCost)}.`, icon: 'cash-outline', variant: 'danger' });
                 }}
                 style={{ marginTop: spacing.sm }}
               />
@@ -338,7 +339,7 @@ function ItCompanyDetail({
                         style={[styles.itHireBtn, !canHire && styles.itHireBtnDisabled]}
                         onPress={() => {
                           const ok = upgrade(id, 1);
-                          if (!ok) Alert.alert("Can't hire", `Need ${formatMoney(hireCost)}.`);
+                          if (!ok) showAlert({ title: "Can't hire", message: `You need ${formatMoney(hireCost)} to hire another employee.`, icon: 'cash-outline', variant: 'danger' });
                         }}
                       >
                         <Ionicons name="add" size={18} color={canHire ? '#FFFFFF' : palette.textTertiary} />
@@ -396,7 +397,7 @@ function ItCompanyDetail({
               style={[styles.itManagerBtn, balance.lt(template.managerCost) && styles.itManagerBtnDisabled]}
               onPress={() => {
                 const ok = hire(id);
-                if (!ok) Alert.alert("Can't hire", `Manager costs ${formatMoney(template.managerCost)}.`);
+                if (!ok) showAlert({ title: "Can't hire manager", message: `Manager costs ${formatMoney(template.managerCost)}.`, icon: 'cash-outline', variant: 'danger' });
               }}
             >
               <Ionicons name="person-add-outline" size={18} color={balance.gte(template.managerCost) ? '#FFFFFF' : palette.textTertiary} />

@@ -1,17 +1,17 @@
-import React from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, Text, View, Pressable } from 'react-native';
+import React, { useState } from 'react';
+import { ScrollView, StyleSheet, Switch, Text, View, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useGame } from '../src/store/gameStore';
 import { palette, radius, shadow, spacing, typography } from '../src/theme';
+import { ConfirmModal } from '../src/components/ConfirmModal';
 
 export default function SettingsScreen() {
   const settings = useGame((s) => s.state.settings);
-  const vip = useGame((s) => s.state.vip);
-  const noAds = useGame((s) => s.state.noAds);
   const updateSettings = useGame((s) => s.updateSettings);
   const reset = useGame((s) => s.reset);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
@@ -48,68 +48,10 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>PREMIUM</Text>
-
-          <View style={[styles.settingRow, styles.vipRow]}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="star" size={20} color="#F59E0B" />
-              <View>
-                <Text style={styles.settingLabel}>VIP Membership</Text>
-                <Text style={styles.settingDesc}>{vip ? 'Active — 24h offline income, no ads' : '8h → 24h offline income, remove all ads'}</Text>
-              </View>
-            </View>
-            {vip ? (
-              <View style={styles.activePill}>
-                <Text style={styles.activePillText}>Active</Text>
-              </View>
-            ) : (
-              <Pressable style={styles.upgradeBtn} onPress={() => {}}>
-                <Text style={styles.upgradeBtnText}>Upgrade</Text>
-              </Pressable>
-            )}
-          </View>
-
-          <View style={[styles.settingRow, !noAds && styles.settingRowLast]}>
-            <View style={styles.settingLeft}>
-              <Ionicons name="close-circle-outline" size={20} color={palette.textSecondary} />
-              <View>
-                <Text style={styles.settingLabel}>Remove ads</Text>
-                <Text style={styles.settingDesc}>{noAds ? 'Ads removed — thank you!' : 'One-time purchase to remove all ads'}</Text>
-              </View>
-            </View>
-            {noAds ? (
-              <View style={styles.activePill}>
-                <Text style={styles.activePillText}>Owned</Text>
-              </View>
-            ) : (
-              <Pressable style={styles.upgradeBtn} onPress={() => {}}>
-                <Text style={styles.upgradeBtnText}>Buy</Text>
-              </Pressable>
-            )}
-          </View>
-        </View>
-
-        <View style={styles.section}>
           <Text style={styles.sectionLabel}>DATA</Text>
           <Pressable
             style={[styles.settingRow, { borderColor: palette.danger, borderWidth: 1 }]}
-            onPress={() => {
-              Alert.alert(
-                'Reset game?',
-                'This will erase ALL progress and start a fresh game. This cannot be undone.',
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Reset',
-                    style: 'destructive',
-                    onPress: async () => {
-                      await reset();
-                      router.replace('/');
-                    },
-                  },
-                ]
-              );
-            }}
+            onPress={() => setConfirmReset(true)}
           >
             <View style={styles.settingLeft}>
               <Ionicons name="refresh-outline" size={20} color={palette.danger} />
@@ -133,6 +75,22 @@ export default function SettingsScreen() {
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <ConfirmModal
+        visible={confirmReset}
+        title="Reset all game progress?"
+        message="This will permanently erase all your businesses, cars, investments, and stats. This cannot be undone."
+        icon="trash"
+        variant="danger"
+        confirmLabel="Yes, reset"
+        cancelLabel="Cancel"
+        onCancel={() => setConfirmReset(false)}
+        onConfirm={async () => {
+          setConfirmReset(false);
+          await reset();
+          router.replace('/');
+        }}
+      />
     </SafeAreaView>
   );
 }

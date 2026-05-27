@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert, Image } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable, Image } from 'react-native';
+import { showAlert } from '../../../../src/components/GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -136,7 +137,7 @@ export default function CarDetail() {
                       disabled={!can}
                       onPress={() => {
                         const res = fix(cb.uid, car.uid, part.id);
-                        if (!res.ok) Alert.alert("Can't fix", res.reason ?? 'Failed');
+                        if (!res.ok) showAlert({ title: "Can't fix", message: res.reason ?? 'Something went wrong.', icon: 'alert-circle', variant: 'danger' });
                       }}
                       style={[styles.partTile, !can && styles.partTileDisabled]}
                     >
@@ -190,7 +191,7 @@ export default function CarDetail() {
         onConfirm={() => {
           setConfirmSell(false);
           const res = listForSale(cb.uid, car.uid);
-          if (!res.ok) Alert.alert("Can't list", res.reason ?? 'Failed');
+          if (!res.ok) showAlert({ title: "Can't list", message: res.reason ?? 'Something went wrong.', icon: 'alert-circle', variant: 'danger' });
         }}
       />
 

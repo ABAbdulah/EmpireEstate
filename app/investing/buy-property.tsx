@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { showAlert } from '../../src/components/GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -40,21 +41,22 @@ export default function BuyPropertyScreen() {
 
   const handleBuy = (prop: PropertyTemplate) => {
     if (ownedIds.has(prop.id)) {
-      Alert.alert('Already owned', 'You already own this property.');
+      showAlert({ title: 'Already owned', message: 'You already own this property.', icon: 'checkmark-circle', variant: 'warning' });
       return;
     }
     if (balance.lt(prop.price)) {
-      Alert.alert("Can't buy", `You need ${formatMoney(prop.price)} to buy this property.`);
+      showAlert({ title: "Can't buy", message: `You need ${formatMoney(prop.price)} to buy this property.`, icon: 'cash-outline', variant: 'danger' });
       return;
     }
-    Alert.alert(
-      `Buy ${prop.name}?`,
-      `Price: ${formatMoney(prop.price)}\nRental income: ${formatMoney(prop.rentPerHour)}/hr`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Buy', onPress: () => { buyProperty(prop.id); router.push('/investing/my-property' as any); } },
-      ],
-    );
+    showAlert({
+      title: `Buy ${prop.name}?`,
+      message: `Price: ${formatMoney(prop.price)}\nRental income: ${formatMoney(prop.rentPerHour)}/hr`,
+      icon: 'home',
+      variant: 'success',
+      confirmLabel: 'Buy property',
+      cancelLabel: 'Cancel',
+      onConfirm: () => { buyProperty(prop.id); router.push('/investing/my-property' as any); },
+    });
   };
 
   return (

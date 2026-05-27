@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { Alert, Image, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { showAlert } from '../../../src/components/GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -38,17 +39,15 @@ export default function PropertyDetailScreen() {
   const proceeds = M(marketValue).times(1 - tmpl.salesTaxRate);
 
   const handleSell = () => {
-    Alert.alert(
-      'Sell property?',
-      `Market value: ${formatMoney(marketValue)}\nSales tax (${(tmpl.salesTaxRate * 100).toFixed(0)}%): -${formatMoney(M(marketValue).times(tmpl.salesTaxRate))}\nYou receive: ${formatMoney(proceeds)}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Sell', style: 'destructive',
-          onPress: () => { sellProperty(uid); router.back(); },
-        },
-      ],
-    );
+    showAlert({
+      title: 'Sell this property?',
+      message: `Market value: ${formatMoney(marketValue)}\nSales tax (${(tmpl.salesTaxRate * 100).toFixed(0)}%): −${formatMoney(M(marketValue).times(tmpl.salesTaxRate))}\nYou receive: ${formatMoney(proceeds)}`,
+      icon: 'pricetag',
+      variant: 'warning',
+      confirmLabel: 'Sell',
+      cancelLabel: 'Cancel',
+      onConfirm: () => { sellProperty(uid); router.back(); },
+    });
   };
 
   return (
@@ -106,7 +105,7 @@ export default function PropertyDetailScreen() {
                   key={u.id}
                   onPress={() => {
                     if (applied) return;
-                    if (!canAfford) { Alert.alert("Can't afford", `This improvement costs ${formatMoney(cost)}.`); return; }
+                    if (!canAfford) { showAlert({ title: "Can't afford", message: `This improvement costs ${formatMoney(cost)}.`, icon: 'cash-outline', variant: 'danger' }); return; }
                     upgradeProperty(uid, u.id);
                   }}
                   style={[styles.improvCard, applied && styles.improvCardDone]}

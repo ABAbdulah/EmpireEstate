@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { showAlert } from '../../src/components/GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -72,7 +73,7 @@ export default function ItemsScreen() {
                       disabled={!can || owned}
                       onPress={() => {
                         const ok = buy(it.id, it.price);
-                        if (!ok) Alert.alert("Can't buy", `${it.name} costs ${formatMoney(it.price)}.`);
+                        if (!ok) showAlert({ title: "Can't buy", message: `${it.name} costs ${formatMoney(it.price)}.`, icon: 'cash-outline', variant: 'danger' });
                       }}
                       style={[styles.itemBuyBtn, (!can || owned) && styles.itemBuyBtnDisabled]}
                     >

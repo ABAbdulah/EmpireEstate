@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, Pressable, TextInput, Alert, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, Pressable, TextInput, ScrollView } from 'react-native';
+import { showAlert } from './GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { BottomSheet } from './BottomSheet';
@@ -95,7 +96,7 @@ export function StartBusinessSheet({ visible, onClose, onStartQuick }: Props) {
               specialization: draft.specialization!,
             });
             if (!res.ok) {
-              Alert.alert("Can't open showroom", res.reason ?? 'Insufficient balance.');
+              showAlert({ title: "Can't open showroom", message: res.reason ?? 'Insufficient balance.', icon: 'cash-outline', variant: 'danger' });
               return;
             }
             close();

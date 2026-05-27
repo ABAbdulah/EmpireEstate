@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { showAlert } from '../../src/components/GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Decimal from 'decimal.js';
@@ -29,7 +30,7 @@ export default function BusinessScreen() {
 
   const onRewarded = useCallback(() => {
     addBoost({ id: 'business_30', multiplier: 1.3, endsAt: Date.now() + 4 * 3600_000 });
-    Alert.alert('Boost active!', '+30% income for 4 hours.');
+    showAlert({ title: 'Boost active!', message: '+30% income for 4 hours.', icon: 'rocket', variant: 'success' });
   }, [addBoost]);
 
   const { adState, show: showRewardedAd } = useRewardedAd(onRewarded);
@@ -158,7 +159,7 @@ export default function BusinessScreen() {
                 onCollect={() => collect(t.id, Date.now())}
                 onHire={() => {
                   const ok = hire(t.id);
-                  if (!ok) Alert.alert("Can't hire", `Need ${formatMoney(t.managerCost)} to hire a manager for ${t.name}.`);
+                  if (!ok) showAlert({ title: "Can't hire", message: `You need ${formatMoney(t.managerCost)} to hire a manager for ${t.name}.`, icon: 'cash-outline', variant: 'danger' });
                 }}
               />
             ))}
@@ -187,7 +188,7 @@ export default function BusinessScreen() {
         onConfirm={(name) => {
           if (!nameOpen) return;
           const ok = buy(nameOpen.id, name);
-          if (!ok) Alert.alert("Can't buy", `Need ${formatMoney(nameOpen.baseCost)} to open ${nameOpen.name}.`);
+          if (!ok) showAlert({ title: "Can't buy", message: `You need ${formatMoney(nameOpen.baseCost)} to open ${nameOpen.name}.`, icon: 'cash-outline', variant: 'danger' });
           setNameOpen(null);
         }}
       />

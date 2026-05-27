@@ -7,6 +7,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useGame } from '../src/store/gameStore';
 import { palette } from '../src/theme';
+import { GlobalModal } from '../src/components/GlobalModal';
 
 export default function RootLayout() {
   const hydrated = useGame((s) => s.hydrated);
@@ -47,6 +48,7 @@ export default function RootLayout() {
           <Stack.Screen name="settings" options={{ presentation: 'card', animation: 'slide_from_right' }} />
           <Stack.Screen name="mergers" options={{ presentation: 'card', animation: 'slide_from_right' }} />
         </Stack>
+        <GlobalModal />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

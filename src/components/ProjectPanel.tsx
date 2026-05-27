@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View, Pressable, Alert } from 'react-native';
+import { StyleSheet, Text, View, Pressable } from 'react-native';
+import { showAlert } from './GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import { useGame } from '../store/gameStore';
 import { getProjectsForBusiness, isProjectUnlocked, ProjectDef } from '../content/projects';
@@ -39,7 +40,7 @@ export function ProjectPanel({ businessId }: Props) {
           onCollect={() => {
             const res = collectProject(businessId);
             if (res.ok && res.reward) {
-              Alert.alert('Project complete!', `Earned ${formatMoney(res.reward)}.`);
+              showAlert({ title: 'Project complete!', message: `You earned ${formatMoney(res.reward)}.`, icon: 'trophy', variant: 'success' });
             }
           }}
         />
@@ -64,31 +65,29 @@ export function ProjectPanel({ businessId }: Props) {
             projectsCompleted={state.projectsCompleted}
             onStart={() => {
               if (!unlocked) {
-                Alert.alert('Locked', `Complete the previous tier (${p.unlockAfter} times) to unlock this.`);
+                showAlert({ title: 'Locked', message: `Complete the previous tier ${p.unlockAfter} times to unlock this project.`, icon: 'lock-closed', variant: 'warning' });
                 return;
               }
               if (!canAfford) {
-                Alert.alert('Insufficient funds', `Need ${formatMoney(p.cost)} to start.`);
+                showAlert({ title: 'Insufficient funds', message: `You need ${formatMoney(p.cost)} to start this project.`, icon: 'cash-outline', variant: 'danger' });
                 return;
               }
               if (active) {
-                Alert.alert('Already running', 'Wait for the current project to finish.');
+                showAlert({ title: 'Already running', message: 'Wait for the current project to finish before starting a new one.', icon: 'time', variant: 'warning' });
                 return;
               }
-              Alert.alert(
-                `Start ${p.name}?`,
-                `Cost: ${formatMoney(p.cost)}\nDuration: ${formatDuration(p.durationSeconds)}\nReward: ${formatMoney(p.reward)}`,
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  {
-                    text: 'Start',
-                    onPress: () => {
-                      const res = startProject(businessId, p.id);
-                      if (!res.ok) Alert.alert("Can't start", res.reason ?? 'Unknown error');
-                    },
-                  },
-                ]
-              );
+              showAlert({
+                title: `Start ${p.name}?`,
+                message: `Cost: ${formatMoney(p.cost)}\nDuration: ${formatDuration(p.durationSeconds)}\nReward on completion: ${formatMoney(p.reward)}`,
+                icon: 'play-circle',
+                variant: 'success',
+                confirmLabel: 'Start project',
+                cancelLabel: 'Cancel',
+                onConfirm: () => {
+                  const res = startProject(businessId, p.id);
+                  if (!res.ok) showAlert({ title: "Can't start", message: res.reason ?? 'Something went wrong.', icon: 'alert-circle', variant: 'danger' });
+                },
+              });
             }}
           />
         );

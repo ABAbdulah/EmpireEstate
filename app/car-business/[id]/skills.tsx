@@ -1,5 +1,6 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { showAlert } from '../../../src/components/GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -62,7 +63,7 @@ export default function SkillsScreen() {
                 style={[styles.upgradeBtn, (atMax || !canAfford) && styles.upgradeBtnDisabled]}
                 onPress={() => {
                   const ok = upgradeCarSkill(cb.uid, k);
-                  if (!ok) Alert.alert("Can't upgrade", canAfford ? 'Already at max level.' : `Need ${formatMoney(upgradeCost)} to upgrade.`);
+                  if (!ok) showAlert({ title: "Can't upgrade", message: canAfford ? 'Already at max level.' : `You need ${formatMoney(upgradeCost)} to upgrade this skill.`, icon: canAfford ? 'checkmark-circle' : 'cash-outline', variant: canAfford ? 'warning' : 'danger' });
                 }}
               >
                 <Text style={[styles.upgradeBtnText, (atMax || !canAfford) && styles.upgradeBtnTextDisabled]}>

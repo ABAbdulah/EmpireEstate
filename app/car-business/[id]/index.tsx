@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert, Image } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable, Image } from 'react-native';
+import { showAlert } from '../../../src/components/GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -197,7 +198,7 @@ export default function CarBusinessDetail() {
               disabled={!can}
               onPress={() => {
                 const ok = buyService(cb.uid, s.id);
-                if (!ok) Alert.alert("Can't open", `Need ${formatMoney(cost)} to open ${s.label.toLowerCase()}.`);
+                if (!ok) showAlert({ title: "Can't open service", message: `You need ${formatMoney(cost)} to open ${s.label.toLowerCase()}.`, icon: 'cash-outline', variant: 'danger' });
                 setServiceSheet(false);
               }}
               style={[styles.svcCard, !can && { opacity: 0.5 }]}

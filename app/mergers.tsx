@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { showAlert } from '../src/components/GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -104,27 +105,25 @@ export default function MergersScreen() {
                       style={[styles.mergeBtn, !allMet && styles.mergeBtnDisabled]}
                       onPress={() => {
                         if (!requirementsMet) {
-                          Alert.alert('Requirements not met', 'Upgrade the required businesses first.');
+                          showAlert({ title: 'Requirements not met', message: 'Upgrade the required businesses first.', icon: 'lock-closed', variant: 'warning' });
                           return;
                         }
                         if (!canAfford) {
-                          Alert.alert('Insufficient funds', `You need ${formatMoney(recipe.investmentCost)} to unlock this merger.`);
+                          showAlert({ title: 'Insufficient funds', message: `You need ${formatMoney(recipe.investmentCost)} to unlock this merger.`, icon: 'cash-outline', variant: 'danger' });
                           return;
                         }
-                        Alert.alert(
-                          `Unlock ${recipe.name}?`,
-                          `Invest ${formatMoney(recipe.investmentCost)} to permanently unlock ${recipe.bonusLabel}.`,
-                          [
-                            { text: 'Cancel', style: 'cancel' },
-                            {
-                              text: 'Merge!',
-                              onPress: () => {
-                                const ok = completeMerger(recipe.id);
-                                if (!ok) Alert.alert('Failed', 'Could not complete merger.');
-                              },
-                            },
-                          ]
-                        );
+                        showAlert({
+                          title: `Unlock ${recipe.name}?`,
+                          message: `Invest ${formatMoney(recipe.investmentCost)} to permanently unlock ${recipe.bonusLabel}.`,
+                          icon: 'git-merge',
+                          variant: 'success',
+                          confirmLabel: 'Merge!',
+                          cancelLabel: 'Cancel',
+                          onConfirm: () => {
+                            const ok = completeMerger(recipe.id);
+                            if (!ok) showAlert({ title: 'Merger failed', message: 'Could not complete merger.', icon: 'alert-circle', variant: 'danger' });
+                          },
+                        });
                       }}
                     >
                       <Text style={[styles.mergeBtnText, !allMet && styles.mergeBtnTextDisabled]}>

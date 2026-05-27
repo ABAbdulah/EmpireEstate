@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View, Pressable, Alert } from 'react-native';
+import { ScrollView, StyleSheet, Text, View, Pressable } from 'react-native';
+import { showAlert } from '../src/components/GlobalModal';
 import { Ionicons } from '@expo/vector-icons';
 import Decimal from 'decimal.js';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -79,24 +80,21 @@ export default function PrestigeScreen() {
         <Pressable
           onPress={() => {
             if (!canPrestige) {
-              Alert.alert('Not yet', `You need ${formatMoney(threshold)} net worth to prestige. Currently at ${formatMoney(networth)}.`);
+              showAlert({ title: 'Not yet', message: `You need ${formatMoney(threshold)} net worth to prestige. Currently at ${formatMoney(networth)}.`, icon: 'lock-closed', variant: 'warning' });
               return;
             }
-            Alert.alert(
-              'Prestige?',
-              `You will reset your empire and gain 1 prestige star (+2% all income). This cannot be undone.`,
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Prestige!',
-                  style: 'destructive',
-                  onPress: () => {
-                    prestigeAction();
-                    router.back();
-                  },
-                },
-              ]
-            );
+            showAlert({
+              title: 'Prestige your empire?',
+              message: 'You will reset your empire and gain 1 prestige star (+2% all income). This cannot be undone.',
+              icon: 'star',
+              variant: 'warning',
+              confirmLabel: 'Prestige!',
+              cancelLabel: 'Cancel',
+              onConfirm: () => {
+                prestigeAction();
+                router.back();
+              },
+            });
           }}
           style={[styles.prestigeBtn, !canPrestige && styles.prestigeBtnDisabled]}
         >
